@@ -10,7 +10,7 @@ Here's the command to set up the conda environment
 conda create --name pgosm-flex \
   --override-channels \
   --channel conda-forge \
-  --channel /home/thath/opt/conda-local-channel \
+  --channel /home/<user>/opt/conda-local-channel \
   python=3.13 \
   pip \
   osmium-tool \
@@ -30,7 +30,7 @@ pip install -r requirements.txt
 Lua:
 
 ```
-luarocks install inifile luasql-postgres PGSQL_DIR=/home/thath/opt/conda/envs/pgosm-flex/
+luarocks install inifile luasql-postgres PGSQL_DIR=/home/<user>/opt/conda/envs/pgosm-flex/
 ```
 
 Additionally, you have to set the following environment variables:
@@ -38,12 +38,12 @@ Additionally, you have to set the following environment variables:
 (these would normally be set by docker)
 
 ```
-export POSTGRES_USER=thath
-export POSTGRES_PASSWORD=thath
-export POSTGRES_DB=berlin_pgosm_flex
+export POSTGRES_USER=user
+export POSTGRES_PASSWORD=password
+export POSTGRES_DB=pgosm
 ```
 
-I also had to add a special `--base-path` argument that's just a temporary work around so that the command is able
+I had to add a special `--base-path` argument that's just a temporary work around so that the command is able
 to find all the files it needs.
 
 You also need to make sure that your data user has `superuser` privileges, so it can create everything (more restricted
@@ -52,7 +52,7 @@ privileges are probably possible, but I did not want to identify these all by ha
 This is the command I'm currently using to run an import for Berlin, Germany:
 
 ```
-python docker/pgosm_flex.py --schema-name pgosm --region=europe/germany --subregion=berlin --ram=6 --base-path=/home/thath/dev/pgosm-flex/ --layerset-path=/home/thath/dev/pgosm-flex/flex-config/layerset/
+python docker/pgosm_flex.py --schema-name pgosm --region=europe/germany --subregion=berlin --ram=6 --base-path=/home/<thath>/dev/pgosm-flex/ --layerset-path=/home/<user>/dev/pgosm-flex/flex-config/layerset/
 ```
 
 
