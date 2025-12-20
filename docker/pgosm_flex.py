@@ -73,13 +73,16 @@ import helpers
 @click.option('--update', default=None,
               type=click.Choice(['append', 'create'], case_sensitive=True),
               help='EXPERIMENTAL - Wrap around osm2pgsql create v. append modes, without using osm2pgsql-replication.')
+@click.option('--base-path',
+              default=None,
+              help='Base path containing files necessary for import. Default "/app"')
 def run_pgosm_flex(ram, region, subregion, debug, force,
                     input_file, layerset, layerset_path, language, pg_dump,
                     pgosm_date, replication, schema_name, skip_nested,
-                    skip_qgis_style, srid, update):
+                    skip_qgis_style, srid, update, base_path):
     """Run PgOSM Flex within Docker to automate osm2pgsql flex processing.
     """
-    paths = get_paths()
+    paths = get_paths(base_path)
     setup_logger(debug)
     logger = logging.getLogger('pgosm-flex')
     logger.info('PgOSM Flex starting...')
@@ -341,7 +344,7 @@ def setup_logger(debug):
     logger.debug('Logger configured')
 
 
-def get_paths():
+def get_paths(base_path: str | None = None):
     """Returns dictionary of various paths used.
 
     Ensures `out_path` exists.
@@ -350,7 +353,7 @@ def get_paths():
     -------------------
     paths : dict
     """
-    base_path = '/app'
+    base_path = base_path if base_path else '/app'
 
     db_path = os.path.join(base_path, 'db')
     out_path = os.path.join(base_path, 'output')

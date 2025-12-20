@@ -98,15 +98,51 @@ def verify_checksum(md5_file: str, path: str):
     logger = logging.getLogger('pgosm-flex')
     logger.debug(f'Validating {md5_file} in {path}')
 
-    returncode = run_command_via_subprocess(cmd=['md5sum', '-c', md5_file],
-                                            cwd=path)
+    import hashlib
 
-    if returncode != 0:
-        err_msg = f'Failed to validate md5sum. Return code: {returncode}'
+    md5 = hashlib.md5()
+
+    with open(md5_file.replace('.md5', ''), 'rb') as f: 
+        while chunk := f.read(8192):
+            md5.update(chunk)
+        actual_md5 = md5.hexdigest()
+
+    with open(md5_file, 'r') as f:
+        expected_md5 = f.read().strip().split()[0]
+
+    if actual_md5 != expected_md5:
+        err_msg = f'Failed to validate md5sum. Expected: {expected_md5}, Actual: {actual_md5}'
         logger.error(err_msg)
         sys.exit(err_msg)
 
     logger.debug('md5sum validated')
+
+
+# def verify_checksum(md5_file: str, path: str):
+#     """Verifies checksum of osm pbf file.
+# 
+#     If verification fails calls `sys.exit()`
+# 
+#     Parameters
+#     ---------------------
+#     md5_file : str
+#         Filename of the MD5 file to verify the osm.pbf file.
+#     path : str
+#         Path to directory with `md5_file` to validate
+#     """
+#     logger = logging.getLogger('pgosm-flex')
+#     logger.debug(f'Validating {md5_file} in {path}')
+# 
+#     returncode = run_command_via_subprocess(cmd=['md5sum', '-c', md5_file],
+#                                             cwd=path)
+# 
+#     if returncode != 0:
+#         breakpoint()
+#         err_msg = f'Failed to validate md5sum. Return code: {returncode}'
+#         logger.error(err_msg)
+#         sys.exit(err_msg)
+# 
+#     logger.debug('md5sum validated')
 
 
 def set_env_vars(region: str, subregion: str, srid: str, language: str,
@@ -152,7 +188,7 @@ def set_env_vars(region: str, subregion: str, srid: str, language: str,
     os.environ['PGOSM_LAYERSET'] = layerset
     os.environ['SCHEMA_NAME'] = schema_name
 
-    # PGOSM_CONN is required to be set by the Lua styles used by osm2pgsql
+    # PGOSM_CONN is required to be set by the Luya styles used by osm2pgsql
     os.environ['PGOSM_CONN'] = db.connection_string()
     # Connection to DB for admin purposes, e.g. drop/create main database
     os.environ['PGOSM_CONN_PG'] = db.connection_string(admin=True)
