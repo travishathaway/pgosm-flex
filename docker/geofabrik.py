@@ -29,7 +29,7 @@ def get_region_filename() -> str:
     return filename
 
 
-def prepare_data(out_path: str) -> str:
+def prepare_data(out_path: str, skip_verify_checksum: bool = False) -> str:
     """Ensures the PBF file is available.
 
     Checks if it already exists locally, download if needed,
@@ -38,6 +38,7 @@ def prepare_data(out_path: str) -> str:
     Parameters
     ----------------------
     out_path : str
+    skip_verify_checksum: boolean
 
     Returns
     ----------------------
@@ -67,7 +68,9 @@ def prepare_data(out_path: str) -> str:
                        pbf_file_with_date,
                        md5_file_with_date)
 
-    helpers.verify_checksum(md5_file, out_path)
+    if not skip_verify_checksum:
+        helpers.verify_checksum(md5_file, out_path)
+
     set_date_from_metadata(pbf_file=pbf_file)
 
     return pbf_file

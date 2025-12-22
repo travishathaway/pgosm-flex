@@ -6,6 +6,12 @@ These are some notes I took while trying to get this running outside of docker.
 
 Here's the command to set up the conda environment
 
+Fetch the remote tags (otherwise this will cause an error later):
+
+```commandline
+git fetch
+```
+
 ```
 conda create --name pgosm-flex \
   --override-channels \
@@ -30,7 +36,8 @@ pip install -r requirements.txt
 Lua:
 
 ```
-luarocks install inifile luasql-postgres PGSQL_DIR=/home/<user>/opt/conda/envs/pgosm-flex/
+luarocks install inifile
+luarocks install luasql-postgres PGSQL_DIR=/home/<user>/opt/conda/envs/pgosm-flex/
 ```
 
 Additionally, you have to set the following environment variables:

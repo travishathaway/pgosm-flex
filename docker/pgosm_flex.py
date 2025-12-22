@@ -67,6 +67,10 @@ import helpers
               default=False,
               is_flag=True,
               help="When set, skips running importing QGIS Styles.")
+@click.option('--skip-verify-checksum',
+              default=False,
+              is_flag=True,
+              help='When set, skips verifying the md5 checksum from Geofabrik')
 @click.option('--srid', required=False, default=helpers.DEFAULT_SRID,
               envvar="PGOSM_SRID",
               help=f'SRID for data loaded by osm2pgsql to PostGIS. Defaults to SRID {helpers.DEFAULT_SRID}.')
@@ -75,11 +79,11 @@ import helpers
               help='EXPERIMENTAL - Wrap around osm2pgsql create v. append modes, without using osm2pgsql-replication.')
 @click.option('--base-path',
               default=None,
-              help='Base path containing files necessary for import. Default "/app"')
+              help='base path containing files necessary for import. default "/app"')
 def run_pgosm_flex(ram, region, subregion, debug, force,
                     input_file, layerset, layerset_path, language, pg_dump,
                     pgosm_date, replication, schema_name, skip_nested,
-                    skip_qgis_style, srid, update, base_path):
+                    skip_qgis_style, srid, update, base_path, skip_verify_checksum):
     """Run PgOSM Flex within Docker to automate osm2pgsql flex processing.
     """
     paths = get_paths(base_path)
@@ -178,7 +182,8 @@ def run_pgosm_flex(ram, region, subregion, debug, force,
                                          skip_nested=skip_nested,
                                          import_mode=import_mode,
                                          debug=debug,
-                                         schema_name=schema_name)
+                                         schema_name=schema_name,
+                                         skip_verify_checksum=skip_verify_checksum)
 
     if not success:
         msg = 'PgOSM Flex completed with errors. Details in output'
@@ -199,7 +204,7 @@ def run_pgosm_flex(ram, region, subregion, debug, force,
 
 
 def run_osm2pgsql_standard(input_file, out_path, flex_path, ram, skip_nested,
-                           import_mode, debug, schema_name):
+                           import_mode, debug, schema_name, skip_verify_checksum=True):
     """Runs standard osm2pgsql command and optionally inits for replication
     (osm2pgsql-replication) mode.
 
@@ -213,6 +218,7 @@ def run_osm2pgsql_standard(input_file, out_path, flex_path, ram, skip_nested,
     import_mode : helpers.helpers.ImportMode
     debug : boolean
     schema_name : str
+    skip_verify_checksum: boolean
 
     Returns
     ---------------------------
@@ -222,7 +228,7 @@ def run_osm2pgsql_standard(input_file, out_path, flex_path, ram, skip_nested,
     logger = logging.getLogger('pgosm-flex')
 
     if input_file is None:
-        geofabrik.prepare_data(out_path=out_path)
+        geofabrik.prepare_data(out_path=out_path, skip_verify_checksum=True)
         pbf_filename = geofabrik.get_region_filename()
     else:
         pbf_filename = input_file

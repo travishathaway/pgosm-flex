@@ -14,6 +14,7 @@ import time
 import psycopg
 import sh
 from urllib import parse
+from psycopg import sql
 
 import qgis_styles
 
@@ -115,11 +116,6 @@ def pg_conn_parts() -> dict:
         pg_db = os.environ['POSTGRES_DB']
     except KeyError:
         LOGGER.debug(f'POSTGRES_DB not set.  Using default {default_db}')
-
-    if pg_db is not None and pg_host == 'localhost':
-        if pg_db != default_db:
-            LOGGER.warning('POSTGRES_DB ignored when using in-Docker database.')
-            pg_db = default_db
 
     if pg_db is None:
         pg_db = default_db
@@ -341,18 +337,24 @@ def drop_pgosm_db():
     ------------------------
     status : bool
     """
-    if not pg_conn_parts()['pg_host'] == 'localhost':
+    conn_parts = pg_conn_parts()
+
+    if not conn_parts['pg_host'] == 'localhost':
         LOGGER.error('Attempted to drop database external from Docker. Not doing that')
         return False
 
-    sql_raw = 'DROP DATABASE IF EXISTS pgosm;'
+    sql_stmt =  sql.SQL('DROP DATABASE IF EXISTS {}').format(sql.Identifier(conn_parts['pg_db']))
+
     conn = get_db_conn(conn_string=os.environ['PGOSM_CONN_PG'])
+    conn.autocommit = True
 
     LOGGER.debug('Setting Pg conn to enable autocommit - required for drop/create DB')
-    conn.autocommit = True
-    conn.execute(sql_raw)
+
+    conn.execute(sql_stmt)
+
     conn.close()
     LOGGER.info('Removed pgosm database')
+
     return True
 
 
@@ -365,18 +367,21 @@ def create_pgosm_db():
     -----------------------
     status : bool
     """
-    if not pg_conn_parts()['pg_host'] == 'localhost':
+    conn_parts = pg_conn_parts()
+
+    if not conn_parts['pg_host'] == 'localhost':
         LOGGER.error('Attempted to create database external from Docker. Not doing that')
         return False
 
-    sql_raw = 'CREATE DATABASE pgosm;'
+    sql_stmt =  sql.SQL('CREATE DATABASE {}').format(sql.Identifier(conn_parts['pg_db']))
+
     conn = get_db_conn(conn_string=os.environ['PGOSM_CONN_PG'])
 
     LOGGER.debug('Setting Pg conn to enable autocommit - required for drop/create DB')
     conn.autocommit = True
 
     try:
-        conn.execute(sql_raw)
+        conn.execute(sql_stmt)
         LOGGER.info('Created pgosm database')
     except psycopg.errors.DuplicateDatabase:
         LOGGER.info('Database already existed.')
