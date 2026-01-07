@@ -6,3 +6,5 @@ pgosm-data/*
 docs/book/*
 .vscode/*
 .idea/
+**/*.gv
+**/.ipynb_checkpoints

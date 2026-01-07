@@ -1,6 +1,28 @@
-# Routing with PgRouting 3
+# Routing Roads: Legacy (pgRouting 3)
 
-> If you are using a pgRouting 4.0 or later see [Routing with pgRouting 4](./routing-4.md).
+## Plan your Upgrade!
+
+This page is a legacy documentation page for versions of pgRouting
+older than 4.0. This process requires more manual effort to setup and
+results in lower-quality routing networks compared to the
+[latest procedures](./routing-road.md).
+
+It is recommended to use pgRouting 4.0 or later, see [the latest Routing Roads](./routing-road.md)
+documentation.
+
+> ⚠️ This page is no longer maintained.
+>
+> This page will remain in the PgOSM documentation for the foreseeable future to ensure
+> continuity for a transition to pgRouting 4.0.
+
+
+## Getting Started
+
+Create the `pgRouting` extension.
+
+```sql
+CREATE EXTENSION IF NOT EXISTS pgrouting;
+```
 
 
 ## Clean the data

@@ -1,4 +1,4 @@
-# PgOSM Flex
+# About PgOSM Flex
 
 PgOSM Flex ([GitHub](https://github.com/rustprooflabs/pgosm-flex))
 provides high quality OpenStreetMap datasets in PostGIS using the
@@ -33,27 +33,23 @@ A few decisions made in this project:
 * Defaults to same units as OpenStreetMap (e.g. km/hr, meters)
 * Data not included in a dedicated column is available from `osm.tags.tags` (`JSONB`)
 * Points, Lines, and Polygons are not mixed in a single table
-* Tracks latest Postgres, PostGIS, and osm2pgsql versions
+* Tracks latest Postgres, PostGIS, osm2pgsql, and pgRouting versions
 
 This project's approach is to do as much processing in the Lua styles
 passed along to osm2pgsql, with post-processing steps creating indexes,
 constraints and comments.
 
 
-## Versions Supported
+## Minimum Versions Supported
 
-Minimum versions supported:
-
-* Postgres 12
-* PostGIS 3.0
-
-This project will attempt, but not guarantee, to support PostgreSQL 12 until it
-reaches it EOL support.
+This project will attempt, but not guarantee, to support each major PostgreSQL version
+until it reaches it EOL support.
 
 The Docker image is pinned to osm2pgsql's `master` branch. Users of the Docker image
 naturally use the latest version of osm2pgsql at the time the Docker image was created.
 
-This project runs entirely in Docker, optionally connecting to an external Postgres instance.
+This project runs entirely in Docker, optionally connecting to an external
+Postgres instance at runtime.
 It should work on any typical OS able to run Docker.
 
 
@@ -72,6 +68,8 @@ package used to determine the best osm2pgsql command assumes fast SSDs.
 
 ## RustProof Labs project
 
-PgOSM Flex is a RustProof Labs project developed and maintained by Ryan Lambert.
+PgOSM Flex is a RustProof Labs project developed and maintained
+by Ryan Lambert and
+[contributors](https://github.com/rustprooflabs/pgosm-flex/graphs/contributors).
 See the [RustProof Labs blog](https://blog.rustprooflabs.com/category/pgosm-flex)
 for more resources and examples of using PgOSM Flex.

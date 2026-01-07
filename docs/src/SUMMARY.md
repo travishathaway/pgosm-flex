@@ -16,11 +16,14 @@
     - [Data Files](./data-files.md)
 - [Query examples](./query.md)
 - [Routing](./routing.md)
-    - [pgRouting 3](./routing-3.md)
-    - [pgRouting 4](./routing-4.md)
+    - [Routing Roads](./routing-road.md)
+    - [Routing Water](./routing-water.md)
+    - [Routing Process](./routing-process.md)
+    - [Routing Roads: Legacy (pgRouting 3)](./routing-3.md)
+
 - [Processing Time](./performance.md)
 
-# Production usages
+# Production Use
 
 - [Postgres Permissions](./postgres-permissions.md)
 - [Using External Postgres Connection](./postgres-external.md)
