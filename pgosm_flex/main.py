@@ -1,8 +1,5 @@
-#!/usr/bin/env python3
-"""Runs PgOSM Flex within Docker container.
-
-Docker image available on Docker Hub
-    https://hub.docker.com/r/rustprooflabs/pgosm-flex
+"""
+pgosm-flex, an OpenStreetMap data import tool for PostgreSQL/PostGIS.
 
 Documentation available at https://pgosm-flex.com/
 """

@@ -1,7 +1,7 @@
 """ Unit tests to cover the DB module."""
 import unittest
 
-from pgosm_flex import pgosm_flex, helpers
+from pgosm_flex import main as pgosm_flex, helpers
 
 
 REGION_US = 'north-america/us'

@@ -10,7 +10,7 @@ import sys
 from time import sleep
 import git
 
-from . import db
+from . import db, __version__
 
 
 DEFAULT_SRID = '3857'
@@ -109,33 +109,6 @@ def verify_checksum(md5_file: str, path: str):
     logger.debug('md5sum validated')
 
 
-# def verify_checksum(md5_file: str, path: str):
-#     """Verifies checksum of osm pbf file.
-# 
-#     If verification fails calls `sys.exit()`
-# 
-#     Parameters
-#     ---------------------
-#     md5_file : str
-#         Filename of the MD5 file to verify the osm.pbf file.
-#     path : str
-#         Path to directory with `md5_file` to validate
-#     """
-#     logger = logging.getLogger('pgosm-flex')
-#     logger.debug(f'Validating {md5_file} in {path}')
-# 
-#     returncode = run_command_via_subprocess(cmd=['md5sum', '-c', md5_file],
-#                                             cwd=path)
-# 
-#     if returncode != 0:
-#         breakpoint()
-#         err_msg = f'Failed to validate md5sum. Return code: {returncode}'
-#         logger.error(err_msg)
-#         sys.exit(err_msg)
-# 
-#     logger.debug('md5sum validated')
-
-
 def set_env_vars(region: str, subregion: str, srid: str, language: str,
                  pgosm_date: str, layerset: str,
                  layerset_path: str, schema_name: str, skip_nested: bool):
@@ -162,7 +135,6 @@ def set_env_vars(region: str, subregion: str, srid: str, language: str,
     logger.debug('Setting environment variables')
 
     os.environ['PGOSM_REGION'] = region
-
 
     if srid != DEFAULT_SRID:
         logger.info(f'SRID set: {srid}')
@@ -211,48 +183,6 @@ def get_region_combined(region: str, subregion: str) -> str:
     return pgosm_region
 
 
-def get_git_info(tag_only: bool=False) -> str:
-    """Provides git info in the form of the latest tag and most recent short sha
-
-    Sends info to logger and returns string.
-
-    Parameters
-    ----------------------
-    tag_only : bool
-        When true, omits the short sha portion, only returning the tag.
-
-    Returns
-    ----------------------
-    git_info : str
-    """
-    logger = logging.getLogger('pgosm-flex')
-
-    try:
-        repo = git.Repo()
-    except git.exc.InvalidGitRepositoryError:
-        # This error happens when running via make for some reason...
-        # This appears to fix it.
-        repo = git.Repo('../')
-
-    try:
-        sha = repo.head.object.hexsha
-        short_sha = repo.git.rev_parse(sha, short=True)
-        latest_tag = repo.git.describe('--abbrev=0', tags=True)
-    except ValueError:
-        git_info = 'Git info unavailable'
-        logger.error('Unable to get git information.')
-        return '-- (version unknown) --'
-
-    if tag_only:
-        git_info = latest_tag
-    else:
-        git_info = f'{latest_tag}-{short_sha}'
-        # Logging only this full version, not the tag_only run
-        logger.info(f'PgOSM Flex version:  {git_info}')
-
-    return git_info
-
-
 def unset_env_vars():
     """Unset environment variables used by PgOSM Flex.
 
@@ -271,7 +201,7 @@ def unset_env_vars():
     os.environ.pop('SKIP_NESTED', None)
 
 
-class ImportMode():
+class ImportMode:
     """Determines logical variables used to control program flow.
 
     WARNING:  The values for `append_first_run` and `replication_update`
@@ -308,7 +238,6 @@ class ImportMode():
         self.set_slim_no_drop()
         self.set_append_first_run()
         self.set_run_post_sql()
-
 
     def okay_to_run(self, prior_import: dict) -> bool:
         """Determines if it is okay to run PgOSM Flex without fear of data loss.
@@ -353,14 +282,9 @@ class ImportMode():
         # Check PgOSM version using Git tags
         # If current version is lower than prior version from latest import, stop.
         prior_import_version = prior_import['pgosm_flex_version_no_hash']
-        git_tag = get_git_info(tag_only=True)
 
-        if git_tag == '-- (version unknown) --':
-            msg = 'Unable to detect PgOSM Flex version from Git.'
-            msg += ' Not enforcing version check against prior version.'
-            self.logger.warning(msg)
-        elif parse_version(git_tag) < parse_version(prior_import_version):
-            msg = f'PgOSM Flex version ({git_tag}) is lower than latest import'
+        if parse_version(__version__) < parse_version(prior_import_version):
+            msg = f'PgOSM Flex version ({__version__}) is lower than latest import'
             msg += f' tracked in the pgosm_flex table ({prior_import_version}).'
             msg += f' Use PgOSM Flex version {prior_import_version} or newer'
             self.logger.error(msg)

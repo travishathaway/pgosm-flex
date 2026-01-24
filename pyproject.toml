@@ -6,8 +6,6 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "click>=8.1.3",
-    "coverage>=6.4.1",
-    "GitPython>=3.1.31",
     "httpx>=0.28.1",
     "osm2pgsql-tuner==0.1.0",
     "osmium>=3.4.1",
@@ -18,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-pgosm-flex = "pgosm_flex.pgosm_flex:run_pgosm_flex"
+pgosm-flex = "pgosm_flex.main:run_pgosm_flex"
 
 [build-system]
 requires = ["hatchling"]
@@ -26,3 +24,8 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["pgosm_flex"]
+
+[dependency-groups]
+dev = [
+    "coverage>=7.13.1",
+]
