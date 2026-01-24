@@ -8,6 +8,7 @@ import subprocess
 import os
 import sys
 from time import sleep
+import warnings
 import git
 
 from . import db, __version__
@@ -115,6 +116,10 @@ def set_env_vars(region: str, subregion: str, srid: str, language: str,
     """Sets environment variables needed by PgOSM Flex. Also creates DB
     record in `osm.pgosm_flex` table.
 
+    .. deprecated:: 0.2.0
+        Use PgOSMFlexConfig from pgosm_flex.config instead.
+        This function will be removed in version 1.0.0.
+
     Parameters
     ------------------------
     region : str
@@ -129,6 +134,13 @@ def set_env_vars(region: str, subregion: str, srid: str, language: str,
     schema_name : str
     skip_nested : bool
     """
+    warnings.warn(
+        "set_env_vars() is deprecated and will be removed in version 1.0.0. "
+        "Use PgOSMFlexConfig from pgosm_flex.config instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+
     logger = logging.getLogger('pgosm-flex')
     logger.debug('Ensuring env vars are not set from prior run')
     unset_env_vars()
@@ -186,8 +198,19 @@ def get_region_combined(region: str, subregion: str) -> str:
 def unset_env_vars():
     """Unset environment variables used by PgOSM Flex.
 
+    .. deprecated:: 0.2.0
+        Use PgOSMFlexConfig from pgosm_flex.config instead.
+        This function will be removed in version 1.0.0.
+
     Does not pop POSTGRES_DB on purpose to allow non-Docker operation.
     """
+    warnings.warn(
+        "unset_env_vars() is deprecated and will be removed in version 1.0.0. "
+        "Use PgOSMFlexConfig from pgosm_flex.config instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+
     os.environ.pop('PGOSM_REGION', None)
     os.environ.pop('PGOSM_SUBREGION', None)
     os.environ.pop('PGOSM_SRID', None)
@@ -203,6 +226,10 @@ def unset_env_vars():
 
 class ImportMode:
     """Determines logical variables used to control program flow.
+
+    .. deprecated:: 0.2.0
+        Use ImportConfig from pgosm_flex.config instead.
+        This class will be removed in version 1.0.0.
 
     WARNING:  The values for `append_first_run` and `replication_update`
     are used to determine when to drop the local DB.  Be careful with any
@@ -222,6 +249,13 @@ class ImportMode:
             `--create` and `--append` modes.
         force : bool
         """
+        warnings.warn(
+            "ImportMode is deprecated and will be removed in version 1.0.0. "
+            "Use ImportConfig from pgosm_flex.config instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+
         self.logger = logging.getLogger('pgosm-flex')
         self.replication = replication
         self.replication_update = replication_update

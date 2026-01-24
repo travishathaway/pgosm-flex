@@ -85,62 +85,90 @@ def run_pgosm_flex(ram, region, subregion, debug, force,
                     skip_qgis_style, srid, update, base_path, skip_verify_checksum):
     """Run PgOSM Flex within Docker to automate osm2pgsql flex processing.
     """
-    paths = get_paths(base_path)
-    setup_logger(debug)
+    # Collect CLI args into dict
+    cli_args = {
+        'ram': ram,
+        'region': region,
+        'subregion': subregion,
+        'debug': debug,
+        'force': force,
+        'input_file': input_file,
+        'layerset': layerset,
+        'layerset_path': layerset_path,
+        'language': language,
+        'pg_dump': pg_dump,
+        'pgosm_date': pgosm_date,
+        'replication': replication,
+        'schema_name': schema_name,
+        'skip_nested': skip_nested,
+        'skip_qgis_style': skip_qgis_style,
+        'srid': srid,
+        'update': update,
+        'base_path': base_path,
+        'skip_verify_checksum': skip_verify_checksum
+    }
+
+    # Load configuration with precedence: CLI > TOML > Env > Defaults
+    from .config import ConfigLoader
+    try:
+        config = ConfigLoader.load(cli_args=cli_args)
+    except ValueError as e:
+        logger = logging.getLogger('pgosm-flex')
+        logger.error(f'Configuration error: {e}')
+        sys.exit(1)
+
+    # Setup paths and logging
+    paths = get_paths(config.processing.base_path)
+    setup_logger(config.processing.debug)
     logger = logging.getLogger('pgosm-flex')
     logger.info('PgOSM Flex starting...')
 
-    if replication and (update is not None):
-        err_msg = 'The --replication and --update features are mutually exclusive. Use one or the other.'
-        logger.error(err_msg)
-        sys.exit(err_msg)
-    # End of input validation
+    # BACKWARD COMPATIBILITY: Apply config to environment
+    # This allows existing code that reads from os.environ to continue working
+    config.apply_to_environment()
 
-    validate_region_inputs(region, subregion, input_file)
-    if region is None and input_file:
-        region = input_file
-
-    helpers.set_env_vars(region, subregion, srid, language, pgosm_date,
-                         layerset, layerset_path, schema_name,
-                         skip_nested)
+    # Use config values throughout
     db.wait_for_postgres()
-    if force and db.pg_conn_parts()['pg_host'] == 'localhost':
+    if config.import_mode.force and db.pg_conn_parts()['pg_host'] == 'localhost':
         msg = 'Using --force with the built-in database is unnecessary.'
         msg += ' The pgosm database is always dropped and recreated when'
         msg += ' running on localhost (in Docker).'
         logger.warning(msg)
 
-    if replication:
+    if config.import_mode.replication:
         replication_update = check_replication_exists()
-        if replication_update and force:
+        if replication_update and config.import_mode.force:
             err_msg = 'Using --force is invalid when --replication is running an update.'
             err_msg += ' See https://pgosm-flex.com/replication.html#resetting-replication'
             err_msg += ' for instructions around this on a development server.'
             logger.error(err_msg)
             sys.exit(f'ERROR: {err_msg}')
+        # Update config with replication_update status
+        config.import_mode.replication_update = replication_update
     else:
         replication_update = False
 
     # Setting pgosm_date when replication is updating isn't an option
     if replication_update:
-        if pgosm_date != helpers.get_today():
+        if config.region.pgosm_date != helpers.get_today():
             logger.warning('Overriding --pgosm-date due to replication update mode, setting to today')
-            pgosm_date = helpers.get_today()
-            os.environ['PGOSM_DATE'] = pgosm_date
+            config.region.pgosm_date = helpers.get_today()
+            os.environ['PGOSM_DATE'] = config.region.pgosm_date
 
-    logger.debug(f'UPDATE setting:  {update}')
-    # Warning: Reusing the module's name here as import_mode...
-    import_mode = helpers.ImportMode(replication=replication,
+    logger.debug(f'UPDATE setting:  {config.import_mode.update}')
+
+    # Create legacy ImportMode object for backward compatibility
+    import_mode = helpers.ImportMode(replication=config.import_mode.replication,
                                      replication_update=replication_update,
-                                     update=update,
-                                     force=force)
+                                     update=config.import_mode.update,
+                                     force=config.import_mode.force)
 
-    db.prepare_pgosm_db(skip_qgis_style=skip_qgis_style,
+    db.prepare_pgosm_db(skip_qgis_style=config.import_mode.skip_qgis_style,
                         db_path=paths['db_path'],
                         import_mode=import_mode,
-                        schema_name=schema_name)
+                        schema_name=config.processing.schema_name)
 
-    prior_import = db.get_prior_import(schema_name=schema_name)
+    prior_import = db.get_prior_import(schema_name=config.processing.schema_name)
 
     if not import_mode.okay_to_run(prior_import):
         msg = 'Not okay to run PgOSM Flex. Exiting'
@@ -155,49 +183,49 @@ def run_pgosm_flex(ram, region, subregion, debug, force,
                                        cwd='/usr/bin/',
                                        output_lines=vers_lines)
 
-    import_id = db.start_import(pgosm_region=helpers.get_region_combined(region, subregion),
-                                pgosm_date=pgosm_date,
-                                srid=srid,
-                                language=language,
-                                layerset=layerset,
+    import_id = db.start_import(pgosm_region=config.region.region_combined,
+                                pgosm_date=config.region.pgosm_date,
+                                srid=config.processing.srid,
+                                language=config.processing.language,
+                                layerset=config.layerset.layerset,
                                 version_info=__version__,
                                 osm2pgsql_version=vers_lines,
                                 import_mode=import_mode,
-                                schema_name=schema_name,
-                                input_file=input_file)
+                                schema_name=config.processing.schema_name,
+                                input_file=config.region.input_file_str)
 
     logger.info(f'Started import id {import_id}')
 
     if import_mode.replication_update:
         logger.info('Running osm2pgsql-replication in update mode')
-        success = run_replication_update(skip_nested=skip_nested,
+        success = run_replication_update(skip_nested=config.import_mode.skip_nested,
                                          flex_path=paths['flex_path'])
     else:
         logger.info('Running osm2pgsql')
-        success = run_osm2pgsql_standard(input_file=input_file,
+        success = run_osm2pgsql_standard(input_file=config.region.input_file_str,
                                          out_path=paths['out_path'],
                                          flex_path=paths['flex_path'],
-                                         ram=ram,
-                                         skip_nested=skip_nested,
+                                         ram=config.processing.ram,
+                                         skip_nested=config.import_mode.skip_nested,
                                          import_mode=import_mode,
-                                         debug=debug,
-                                         schema_name=schema_name,
-                                         skip_verify_checksum=skip_verify_checksum)
+                                         debug=config.processing.debug,
+                                         schema_name=config.processing.schema_name,
+                                         skip_verify_checksum=config.region.skip_verify_checksum)
 
     if not success:
         msg = 'PgOSM Flex completed with errors. Details in output'
         db.log_import_message(import_id=import_id, msg='Failed',
-                              schema_name=schema_name)
+                              schema_name=config.processing.schema_name)
         logger.warning(msg)
         sys.exit(msg)
 
     db.log_import_message(import_id=import_id, msg='Completed',
-                          schema_name=schema_name)
+                          schema_name=config.processing.schema_name)
 
-    dump_database(input_file=input_file,
+    dump_database(input_file=config.region.input_file_str,
                   out_path=paths['out_path'],
-                  pg_dump=pg_dump,
-                  skip_qgis_style=skip_qgis_style)
+                  pg_dump=config.import_mode.pg_dump,
+                  skip_qgis_style=config.import_mode.skip_qgis_style)
 
     logger.info('PgOSM Flex complete!')
 

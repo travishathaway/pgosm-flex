@@ -13,6 +13,9 @@ dependencies = [
     "psycopg>=3.1",
     "psycopg-binary>=3.1",
     "sh>=1.14.2",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "tomli>=2.0.1; python_version<'3.11'",
 ]
 
 [project.scripts]

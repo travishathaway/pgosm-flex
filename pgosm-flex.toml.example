@@ -1,0 +1,45 @@
+# PgOSM Flex Configuration File Example
+# See documentation for full details on configuration options
+
+# Database connection settings
+[database]
+host = "localhost"
+port = 5432
+database = "pgosm"
+user = "postgres"
+# password = "secret"  # Optional - prefer using ~/.pgpass instead
+
+# Region and data source configuration
+[region]
+# Option 1: Use Geofabrik region
+region = "north-america"
+subregion = "colorado"
+
+# Option 2: Use custom input file (mutually exclusive with region)
+# input_file = "/path/to/custom.osm.pbf"
+
+pgosm_date = "2024-01-20"  # Default: today
+skip_verify_checksum = false
+
+# Layerset configuration
+[layerset]
+layerset = "default"  # Options: default, minimal, basic, everything
+# layerset_path = "/custom/path/to/layerset"  # Optional custom path
+
+# Import mode settings
+[import_mode]
+force = false              # WARNING: Overwrites existing data
+replication = false        # Enable osm2pgsql-replication mode
+# update = "append"        # Options: append, create (mutually exclusive with replication)
+skip_nested = false        # Skip nested polygon calculation (faster for large regions)
+skip_qgis_style = false    # Skip QGIS style import
+pg_dump = true             # Create pg_dump after import
+
+# Processing configuration
+[processing]
+ram = 4.0                  # Required: Amount of RAM in GB
+srid = "3857"              # Spatial reference (default: Web Mercator)
+language = "en"            # Default language for names
+schema_name = "osm"        # PostgreSQL schema name
+# base_path = "/app"       # Base path for files (default: /app)
+debug = false              # Enable debug logging
