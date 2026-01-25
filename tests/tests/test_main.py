@@ -31,7 +31,6 @@ class PgOSMFlexTests(unittest.TestCase):
         actual = pgosm_flex.get_paths()
         self.assertEqual(expected, type(actual))
 
-
     def test_validate_region_inputs_raises_ValueError_no_region_or_input(self):
         region = None
         subregion = None
@@ -39,7 +38,6 @@ class PgOSMFlexTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             pgosm_flex.validate_region_inputs(region, subregion, input_file)
-
 
     def test_validate_region_inputs_raises_ValueError_subregion_wout_region(self):
         region = None

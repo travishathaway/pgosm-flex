@@ -3,9 +3,8 @@ project.
 """
 import logging
 import os
-import osm2pgsql_tuner as tuner
 
-from . import db, helpers
+from . import db, helpers, osm2pgsql_tuner as tuner
 
 LOGGER = logging.getLogger('pgosm-flex')
 

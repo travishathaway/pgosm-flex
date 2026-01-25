@@ -256,7 +256,7 @@ def start_import(pgosm_region, pgosm_date, srid, language, layerset, version_inf
     ---------------------------
     pgosm_region : str
     pgosm_date : str (ish?)
-    srid : int
+    srid : str
     language : str
     layerset : str
     git_info : str

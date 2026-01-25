@@ -84,6 +84,10 @@ Here's a couple examples of how I'm addressing this:
 
 ### Wishlist going forward: possible beta release
 
+#### Add missing conda-forge packages
+
+- osmium (python bindings)
+
 #### Configuration refactors
 
 The configuration for the project could be improved by adding a central `config` module. Right now,
@@ -105,6 +109,10 @@ claude-code prompt:
 > A lot  of the existing logic for parsing configuration is in "helpers.py". Can you come up with a plan to refactor this code and
 > enable this  new feature of being able to set configuration values in a toml file?
 
+##### Status
+
+I'm still working on this part and properly disentangling the config from purely relying on environment variables.
+
 #### Create a data directory for managing downloads
 
 The place where the CLI downloads and stores its data should be in an OS friendly spot using
@@ -113,8 +121,30 @@ the `platformdirs` package.
 - Default should be in a spot determined by `platformdirs`
 - Users should be able to override this by a configuration setting
 
+##### Status
+
+Not complete
+
 #### Setup pre-commit, linters and type hinters
 
 To ensure consistent coding style, I will introduce the same type of pre-commit hooks and linters
 that I did for `zensus2pgsql`.
 
+##### Status
+
+Not complete
+
+#### Make integration tests work without using the Dockerfile in this repository
+
+The Dockerfile is doing a lot of things to build actual environment that the import script
+has to run in. Once everything has been packaged as conda packages, I'll be able to just
+bootstrap the Docker image with conda and install all the packages I need from conda-forge.
+
+##### Status
+
+I was able to get this started but still need to finish it by getting a working example up and
+running.
+
+The part that I was missing that I worked on was having all of this projects dependencies available
+as conda dependencies. I was able to complete this part and now everything is saved in the
+`~/opt/conda-local-channel`.

@@ -17,6 +17,7 @@ from . import osm2pgsql_recommendation as rec
 from . import db
 from . import geofabrik
 from . import helpers
+from .config import ConfigLoader
 
 
 @click.command()
@@ -109,7 +110,6 @@ def run_pgosm_flex(ram, region, subregion, debug, force,
     }
 
     # Load configuration with precedence: CLI > TOML > Env > Defaults
-    from .config import ConfigLoader
     try:
         config = ConfigLoader.load(cli_args=cli_args)
     except ValueError as e:
@@ -122,10 +122,6 @@ def run_pgosm_flex(ram, region, subregion, debug, force,
     setup_logger(config.processing.debug)
     logger = logging.getLogger('pgosm-flex')
     logger.info('PgOSM Flex starting...')
-
-    # BACKWARD COMPATIBILITY: Apply config to environment
-    # This allows existing code that reads from os.environ to continue working
-    config.apply_to_environment()
 
     # Use config values throughout
     db.wait_for_postgres()
