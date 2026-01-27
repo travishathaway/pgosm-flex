@@ -50,11 +50,11 @@ export POSTGRES_PASSWORD=password
 export POSTGRES_DB=pgosm
 ```
 
-I had to add a special `--base-path` argument that's just a temporary work around so that the command is able
-to find all the files it needs.
+I had to add a special `--base-path` argument that's just a temporary work around so that
+the command is able to find all the files it needs.
 
-You also need to make sure that your data user has `superuser` privileges, so it can create everything (more restricted
-privileges are probably possible, but I did not want to identify these all by hand).
+You also need to make sure that your data user has `superuser` privileges, so it can create everything
+(more restricted privileges are probably possible, but I did not want to identify these all by hand).
 
 This is the command I'm currently using to run an import for Berlin, Germany:
 
@@ -148,3 +148,13 @@ running.
 The part that I was missing that I worked on was having all of this projects dependencies available
 as conda dependencies. I was able to complete this part and now everything is saved in the
 `~/opt/conda-local-channel`.
+
+
+## 2026-01-26: remove lua
+
+After studying the code so more, I noticed that there's a lot of logic in lua that doesn't need to
+be. I might be oversimplifying, but it looks like it's just running a bunch SQL files in a 
+for-loop. I think we can just move all this to Python to remove the dependency on lua altogether.
+Right now, the installation is a little cumbersome because you have to install pypi dependencies
+(these will eventually all be available as conda dependencies) and you have to install two
+lua packages via `luarocks`.

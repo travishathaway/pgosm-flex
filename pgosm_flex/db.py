@@ -490,33 +490,122 @@ def get_db_conn(conn_string):
     return conn
 
 
-def pgosm_after_import(flex_path: str) -> bool:
-    """Runs post-processing SQL via Lua script.
-
-    Layerset logic is established via environment variable, must happen
-    before this step.
+def run_post_processing_sql(flex_path: str, layer_name: str, schema_name: str,
+                           conn_string: str) -> bool:
+    """Executes post-processing SQL file for a specific layer.
 
     Parameters
     ---------------------
     flex_path : str
+        Path to flex-config directory
+    layer_name : str
+        Name of the layer (maps to SQL filename)
+    schema_name : str
+        Target schema name for substitution
+    conn_string : str
+        Database connection string
+
+    Returns
+    ---------------------
+    bool
+        True if SQL executed successfully, False on error
     """
-    LOGGER.info('Running post-processing...')
+    sql_file_path = os.path.join(flex_path, 'sql', f'{layer_name}.sql')
 
-    cmds = ['lua', 'run-sql.lua']
+    try:
+        LOGGER.info(f'Processing layer: {layer_name}')
 
-    output = subprocess.run(cmds,
-                            text=True,
-                            cwd=flex_path,
-                            check=False,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT)
-    LOGGER.info(f'Post-processing SQL output: \n {output.stdout}')
+        with open(sql_file_path, 'r') as f:
+            sql_content = f.read()
 
-    if output.returncode != 0:
-        err_msg = f'Failed to run post-processing SQL. Return code: {output.returncode}'
-        LOGGER.error(err_msg)
+        # Schema name substitution - use replace() not format()
+        # SQL files may contain { } characters
+        sql_content = sql_content.replace('osm.', f'{schema_name}.')
+
+        with get_db_conn(conn_string=conn_string) as conn:
+            cur = conn.cursor()
+            cur.execute(sql_content)
+
+        LOGGER.debug(f'Successfully processed {layer_name}')
+        return True
+
+    except FileNotFoundError:
+        LOGGER.error(f'SQL file not found: {sql_file_path}')
+        return False
+    except psycopg.Error as e:
+        LOGGER.error(f'Database error processing {layer_name}: {e}')
+        return False
+    except Exception as e:
+        LOGGER.error(f'Error processing {layer_name}: {e}')
         return False
 
+
+def pgosm_after_import(flex_path: str, schema_name: str, skip_nested: bool,
+                       layerset_config: dict, conn_string: str) -> bool:
+    """Runs post-processing SQL for enabled layers.
+
+    Replaces previous Lua-based implementation (run-sql.lua) with native Python.
+    Executes SQL files for each enabled layer based on layerset configuration.
+
+    Parameters
+    ---------------------
+    flex_path : str
+        Path to flex-config directory containing SQL files
+    schema_name : str
+        Target schema name for OpenStreetMap data
+    skip_nested : bool
+        If True, skip processing place_polygon_nested
+    layerset_config : dict
+        Dictionary of layer names to enabled status from INI file
+    conn_string : str
+        Database connection string
+
+    Returns
+    ---------------------
+    bool
+        True if all SQL executed successfully, False if any errors occurred
+    """
+    LOGGER.info('Running post-processing...')
+    LOGGER.debug(f'Schema name: {schema_name}')
+    LOGGER.debug(f'Skip nested: {skip_nested}')
+    LOGGER.debug(f'Loaded layerset config with {len(layerset_config)} layers')
+
+    # Define layers to process (matches Lua's layer list)
+    # Must match order and naming from run-sql.lua:39-43
+    layers = [
+        'amenity', 'building', 'building_combined_point', 'indoor',
+        'infrastructure', 'landuse', 'leisure', 'natural', 'place',
+        'poi', 'public_transport', 'road', 'road_major', 'shop',
+        'shop_combined_point', 'tags', 'traffic', 'unitable', 'water'
+    ]
+
+    error_count = 0
+
+    # Handle place_polygon_nested (runs when NOT skip_nested)
+    # Note: Lua code had logic bug (checked truthy string), we fix it here
+    if not skip_nested:
+        LOGGER.info('Processing place_polygon_nested')
+        if not run_post_processing_sql(flex_path, 'place_polygon_nested',
+                                      schema_name, conn_string):
+            error_count += 1
+    else:
+        LOGGER.info('Skipping place_polygon_nested (skip_nested=True)')
+
+    # Process each enabled layer
+    for layer in layers:
+        # Check if layer is enabled in layerset config
+        # INI values come as strings 'true' or 'false'
+        if layer in layerset_config and layerset_config[layer].lower() == 'true':
+            if not run_post_processing_sql(flex_path, layer, schema_name, conn_string):
+                error_count += 1
+        else:
+            LOGGER.debug(f'Skipping layer: {layer} (not enabled in layerset)')
+
+    if error_count > 0:
+        LOGGER.error(f'Post-processing completed with {error_count} error(s)')
+        return False
+
+    LOGGER.info('Post-processing completed successfully')
     return True
 
 

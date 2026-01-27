@@ -46,6 +46,7 @@ def osm2pgsql_recommendation(ram: float, pbf_filename: str, out_path: str,
                                            out_path)
     return osm2pgsql_cmd
 
+
 def get_recommended_script(system_ram_gb: float,
                            osm_pbf_gb: float,
                            import_mode:helpers.ImportMode,

@@ -206,6 +206,7 @@ def run_pgosm_flex(ram, region, subregion, debug, force,
                                          import_mode=import_mode,
                                          debug=config.processing.debug,
                                          schema_name=config.processing.schema_name,
+                                         config=config,
                                          skip_verify_checksum=config.region.skip_verify_checksum)
 
     if not success:
@@ -227,7 +228,7 @@ def run_pgosm_flex(ram, region, subregion, debug, force,
 
 
 def run_osm2pgsql_standard(input_file, out_path, flex_path, ram, skip_nested,
-                           import_mode, debug, schema_name, skip_verify_checksum=True):
+                           import_mode, debug, schema_name, config, skip_verify_checksum=True):
     """Runs standard osm2pgsql command and optionally inits for replication
     (osm2pgsql-replication) mode.
 
@@ -241,6 +242,8 @@ def run_osm2pgsql_standard(input_file, out_path, flex_path, ram, skip_nested,
     import_mode : helpers.helpers.ImportMode
     debug : boolean
     schema_name : str
+    config : ConfigLoader
+        Configuration object to pass to post-processing
     skip_verify_checksum: boolean
 
     Returns
@@ -271,7 +274,8 @@ def run_osm2pgsql_standard(input_file, out_path, flex_path, ram, skip_nested,
     post_processing = run_post_processing(flex_path=flex_path,
                                           skip_nested=skip_nested,
                                           import_mode=import_mode,
-                                          schema_name=schema_name)
+                                          schema_name=schema_name,
+                                          config=config)
 
     if import_mode.replication:
         run_osm2pgsql_replication_init(pbf_path=out_path,
@@ -545,7 +549,7 @@ def layerset_include_place(flex_path: str) -> bool:
     return place
 
 
-def run_post_processing(flex_path, skip_nested, import_mode, schema_name):
+def run_post_processing(flex_path, skip_nested, import_mode, schema_name, config):
     """Runs steps following osm2pgsql import.
 
     Post-processing SQL scripts and (optionally) calculate nested admin polygons
@@ -556,11 +560,14 @@ def run_post_processing(flex_path, skip_nested, import_mode, schema_name):
     skip_nested : bool
     import_mode : helpers.helpers.ImportMode
     schema_name : str
+    config : ConfigLoader
+        Configuration object containing layerset and database settings
 
     Returns
     ----------------------
     status : bool
     """
+    from pathlib import Path
     logger = logging.getLogger('pgosm-flex')
 
     if not import_mode.run_post_sql:
@@ -570,7 +577,17 @@ def run_post_processing(flex_path, skip_nested, import_mode, schema_name):
         db.osm2pgsql_replication_finish(skip_nested=skip_nested)
         return True
 
-    post_processing_sql = db.pgosm_after_import(flex_path=flex_path)
+    # Load layerset configuration
+    layerset_config = config.layerset.load_layerset_ini(Path(flex_path))
+
+    # Run post-processing with config values
+    post_processing_sql = db.pgosm_after_import(
+        flex_path=flex_path,
+        schema_name=config.processing.schema_name,
+        skip_nested=config.import_mode.skip_nested,
+        layerset_config=layerset_config,
+        conn_string=config.database.connection_string()
+    )
 
     if skip_nested:
         logger.info('Skipping calculating nested polygons')

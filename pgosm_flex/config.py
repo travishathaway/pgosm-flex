@@ -187,10 +187,7 @@ class LayersetConfig(BaseModel):
 
 
 class ImportConfig(BaseModel):
-    """Import mode configuration.
-
-    Consolidates logic from helpers.ImportMode class (lines 204-366).
-    """
+    """Import mode configuration."""
 
     # Input flags
     force: bool = False
