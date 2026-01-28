@@ -11,6 +11,7 @@ pgosm_tests database.
 
 Run with: pytest -m integration tests/integration/test_extra_loads.py
 """
+
 import os
 import pytest
 import psycopg
@@ -20,10 +21,10 @@ from pathlib import Path
 
 def get_extra_region_files(test_data_dir):
     """Get all PBF files from extra-regions directory."""
-    extra_dir = test_data_dir / 'extra-regions'
+    extra_dir = test_data_dir / "extra-regions"
     if not extra_dir.exists():
         return []
-    return sorted(extra_dir.glob('*.osm.pbf'))
+    return sorted(extra_dir.glob("*.osm.pbf"))
 
 
 @pytest.fixture(scope="function")
@@ -33,15 +34,15 @@ def test_database():
     This fixture drops and recreates the database for each test.
     """
     # Connection parameters
-    user = os.environ.get('POSTGRES_USER', 'postgres')
-    password = os.environ.get('POSTGRES_PASSWORD')
-    host = os.environ.get('POSTGRES_HOST', 'localhost')
+    user = os.environ.get("POSTGRES_USER", "postgres")
+    password = os.environ.get("POSTGRES_PASSWORD")
+    host = os.environ.get("POSTGRES_HOST", "localhost")
 
     # Admin connection (to postgres database)
     if password:
-        admin_conn_str = f'postgresql://{user}:{password}@{host}/postgres'
+        admin_conn_str = f"postgresql://{user}:{password}@{host}/postgres"
     else:
-        admin_conn_str = f'postgresql://{user}@{host}/postgres'
+        admin_conn_str = f"postgresql://{user}@{host}/postgres"
 
     # Drop test database if exists
     admin_conn = psycopg.connect(admin_conn_str, autocommit=True)
@@ -54,9 +55,9 @@ def test_database():
 
     # Connect to test database and create schema
     if password:
-        test_conn_str = f'postgresql://{user}:{password}@{host}/pgosm_tests'
+        test_conn_str = f"postgresql://{user}:{password}@{host}/pgosm_tests"
     else:
-        test_conn_str = f'postgresql://{user}@{host}/pgosm_tests'
+        test_conn_str = f"postgresql://{user}@{host}/pgosm_tests"
 
     test_conn = psycopg.connect(test_conn_str)
     try:
@@ -76,9 +77,11 @@ def test_database():
 class TestExtraRegionLoads:
     """Test loading extra region PBF files."""
 
-    @pytest.mark.parametrize("pbf_file",
-                             get_extra_region_files(Path(__file__).parent.parent / 'data'),
-                             ids=lambda x: x.name)
+    @pytest.mark.parametrize(
+        "pbf_file",
+        get_extra_region_files(Path(__file__).parent.parent / "data"),
+        ids=lambda x: x.name,
+    )
     @pytest.mark.timeout(300)  # 5 minute timeout per load
     def test_load_extra_region(self, test_database, pbf_file, test_data_dir):
         """Test loading an extra region PBF file.
@@ -93,22 +96,25 @@ class TestExtraRegionLoads:
             Path to test data directory
         """
         # Path to flex-config directory (two levels up from tests/integration)
-        flex_config_dir = test_data_dir.parent.parent / 'flex-config'
+        flex_config_dir = test_data_dir.parent.parent / "flex-config"
 
-        assert flex_config_dir.exists(), f"flex-config directory not found: {flex_config_dir}"
+        assert flex_config_dir.exists(), (
+            f"flex-config directory not found: {flex_config_dir}"
+        )
 
         # Build osm2pgsql command
         # Extract database name from connection string
-        db_name = 'pgosm_tests'
+        db_name = "pgosm_tests"
 
         cmd = [
-            'osm2pgsql',
-            '--slim',
-            '--drop',
-            '-d', db_name,
-            '--output=flex',
-            '--style=run-all.lua',
-            str(pbf_file.absolute())
+            "osm2pgsql",
+            "--slim",
+            "--drop",
+            "-d",
+            db_name,
+            "--output=flex",
+            "--style=run-all.lua",
+            str(pbf_file.absolute()),
         ]
 
         # Run osm2pgsql
@@ -117,7 +123,7 @@ class TestExtraRegionLoads:
             cwd=str(flex_config_dir),
             capture_output=True,
             text=True,
-            timeout=300  # 5 minute timeout
+            timeout=300,  # 5 minute timeout
         )
 
         # Check if successful
@@ -155,35 +161,32 @@ def test_all_extra_regions_load(test_database, test_data_dir):
     This test is separate from the parametrized test above and loads
     all regions in one go to verify they can all be processed.
     """
-    extra_dir = test_data_dir / 'extra-regions'
+    extra_dir = test_data_dir / "extra-regions"
     if not extra_dir.exists():
         pytest.skip("extra-regions directory not found")
 
-    pbf_files = list(extra_dir.glob('*.osm.pbf'))
+    pbf_files = list(extra_dir.glob("*.osm.pbf"))
 
     if not pbf_files:
         pytest.skip("No PBF files found in extra-regions")
 
     loaded_count = 0
-    flex_config_dir = test_data_dir.parent.parent / 'flex-config'
+    flex_config_dir = test_data_dir.parent.parent / "flex-config"
 
     for pbf_file in pbf_files:
         cmd = [
-            'osm2pgsql',
-            '--slim',
-            '--drop',
-            '-d', 'pgosm_tests',
-            '--output=flex',
-            '--style=run-all.lua',
-            str(pbf_file.absolute())
+            "osm2pgsql",
+            "--slim",
+            "--drop",
+            "-d",
+            "pgosm_tests",
+            "--output=flex",
+            "--style=run-all.lua",
+            str(pbf_file.absolute()),
         ]
 
         result = subprocess.run(
-            cmd,
-            cwd=str(flex_config_dir),
-            capture_output=True,
-            text=True,
-            timeout=300
+            cmd, cwd=str(flex_config_dir), capture_output=True, text=True, timeout=300
         )
 
         if result.returncode == 0:

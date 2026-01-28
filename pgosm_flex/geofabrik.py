@@ -1,5 +1,5 @@
-"""This module handles the auto-file handling using Geofabrik's download service.
-"""
+"""This module handles the auto-file handling using Geofabrik's download service."""
+
 import logging
 import httpx
 import json
@@ -19,10 +19,10 @@ def get_region_filename() -> str:
     ----------------------
     filename : str
     """
-    region = os.environ.get('PGOSM_REGION')
-    subregion = os.environ.get('PGOSM_SUBREGION')
+    region = os.environ.get("PGOSM_REGION")
+    subregion = os.environ.get("PGOSM_SUBREGION")
 
-    base_name = '{}-latest.osm.pbf'
+    base_name = "{}-latest.osm.pbf"
     if subregion is None:
         filename = base_name.format(region)
     else:
@@ -47,28 +47,25 @@ def prepare_data(out_path: str, skip_verify_checksum: bool = False) -> str:
     pbf_file : str
         Full path to PBF file
     """
-    region = os.environ.get('PGOSM_REGION')
-    subregion = os.environ.get('PGOSM_SUBREGION')
-    pgosm_date = os.environ.get('PGOSM_DATE')
+    region = os.environ.get("PGOSM_REGION")
+    subregion = os.environ.get("PGOSM_SUBREGION")
+    pgosm_date = os.environ.get("PGOSM_DATE")
 
     pbf_filename = get_region_filename()
 
     pbf_file = os.path.join(out_path, pbf_filename)
-    pbf_file_with_date = pbf_file.replace('latest', pgosm_date)
+    pbf_file_with_date = pbf_file.replace("latest", pgosm_date)
 
-    md5_file = f'{pbf_file}.md5'
-    md5_file_with_date = f'{pbf_file_with_date}.md5'
+    md5_file = f"{pbf_file}.md5"
+    md5_file_with_date = f"{pbf_file_with_date}.md5"
 
     if pbf_download_needed(pbf_file_with_date, md5_file_with_date, pgosm_date):
-        logging.getLogger('pgosm-flex').info('Downloading PBF and MD5 files...')
+        logging.getLogger("pgosm-flex").info("Downloading PBF and MD5 files...")
         download_data(region, subregion, pbf_file, md5_file)
         archive_data(pbf_file, md5_file, pbf_file_with_date, md5_file_with_date)
     else:
-        logging.getLogger('pgosm-flex').info('Copying Archived files')
-        unarchive_data(pbf_file,
-                       md5_file,
-                       pbf_file_with_date,
-                       md5_file_with_date)
+        logging.getLogger("pgosm-flex").info("Copying Archived files")
+        unarchive_data(pbf_file, md5_file, pbf_file_with_date, md5_file_with_date)
 
     if not skip_verify_checksum:
         helpers.verify_checksum(md5_file, out_path)
@@ -87,35 +84,33 @@ def set_date_from_metadata(pbf_file: str):
     pbf_file : str
         Full path to the `.osm.pbf` file.
     """
-    logger = logging.getLogger('pgosm-flex')
-    osmium_cmd = f'osmium fileinfo {pbf_file} --json'
+    logger = logging.getLogger("pgosm-flex")
+    osmium_cmd = f"osmium fileinfo {pbf_file} --json"
     output = []
-    returncode = helpers.run_command_via_subprocess(cmd=osmium_cmd.split(),
-                                                    cwd=None,
-                                                    output_lines=output,
-                                                    print_to_log=False)
+    returncode = helpers.run_command_via_subprocess(
+        cmd=osmium_cmd.split(), cwd=None, output_lines=output, print_to_log=False
+    )
     if returncode != 0:
-        logger.error(f'osmium fileinfo failed.  Output: {output}')
+        logger.error(f"osmium fileinfo failed.  Output: {output}")
 
-    output_joined = json.loads(''.join(output))
-    meta_options = output_joined['header']['option']
+    output_joined = json.loads("".join(output))
+    meta_options = output_joined["header"]["option"]
 
     try:
-        meta_timestamp = meta_options['timestamp']
+        meta_timestamp = meta_options["timestamp"]
     except KeyError:
         try:
-            meta_timestamp = meta_options['osmosis_replication_timestamp']
+            meta_timestamp = meta_options["osmosis_replication_timestamp"]
         except KeyError:
             meta_timestamp = None
 
-    logger.info(f'PBF Meta timestamp: {meta_timestamp}')
-    os.environ['PBF_TIMESTAMP'] = meta_timestamp
+    logger.info(f"PBF Meta timestamp: {meta_timestamp}")
+    os.environ["PBF_TIMESTAMP"] = meta_timestamp
 
 
-def pbf_download_needed(pbf_file_with_date: str,
-                        md5_file_with_date: str,
-                        pgosm_date: str
-                        ) -> bool:
+def pbf_download_needed(
+    pbf_file_with_date: str, md5_file_with_date: str, pgosm_date: str
+) -> bool:
     """Decides if the PBF/MD5 files need to be downloaded.
 
     Parameters
@@ -128,31 +123,31 @@ def pbf_download_needed(pbf_file_with_date: str,
     --------------------------
     download_needed : bool
     """
-    logger = logging.getLogger('pgosm-flex')
+    logger = logging.getLogger("pgosm-flex")
     # If the PBF file exists, check for the MD5 file too.
-    logger.debug(f'Checking for PBF File: {pbf_file_with_date}')
+    logger.debug(f"Checking for PBF File: {pbf_file_with_date}")
 
     if os.path.exists(pbf_file_with_date):
-        logger.info(f'PBF File exists {pbf_file_with_date}')
+        logger.info(f"PBF File exists {pbf_file_with_date}")
 
         if os.path.exists(md5_file_with_date):
-            logger.info('PBF & MD5 files exist.  Download not needed')
+            logger.info("PBF & MD5 files exist.  Download not needed")
             download_needed = False
         else:
             if pgosm_date == helpers.get_today():
-                print('PBF for today available but not MD5... download needed')
+                print("PBF for today available but not MD5... download needed")
                 download_needed = True
             else:
-                err = f'Missing MD5 file for {pgosm_date}. Cannot validate.'
+                err = f"Missing MD5 file for {pgosm_date}. Cannot validate."
                 logger.error(err)
                 raise FileNotFoundError(err)
     else:
         if not pgosm_date == helpers.get_today():
-            err = f'Missing PBF file for {pgosm_date}. Cannot proceed.'
+            err = f"Missing PBF file for {pgosm_date}. Cannot proceed."
             logger.error(err)
             raise FileNotFoundError(err)
 
-        logger.info('PBF file not found locally. Download required')
+        logger.info("PBF file not found locally. Download required")
         download_needed = True
 
     return download_needed
@@ -170,12 +165,12 @@ def get_pbf_url(region: str, subregion: str) -> str:
     ----------------------
     pbf_url : str
     """
-    base_url = 'https://download.geofabrik.de'
+    base_url = "https://download.geofabrik.de"
 
     if subregion is None:
-        pbf_url = f'{base_url}/{region}-latest.osm.pbf'
+        pbf_url = f"{base_url}/{region}-latest.osm.pbf"
     else:
-        pbf_url = f'{base_url}/{region}/{subregion}-latest.osm.pbf'
+        pbf_url = f"{base_url}/{region}/{subregion}-latest.osm.pbf"
 
     return pbf_url
 
@@ -190,21 +185,22 @@ def download_data(region: str, subregion: str, pbf_file: str, md5_file: str):
     pbf_file : str
     md5_file : str
     """
-    logger = logging.getLogger('pgosm-flex')
-    logger.info(f'Downloading PBF data to {pbf_file}')
+    logger = logging.getLogger("pgosm-flex")
+    logger.info(f"Downloading PBF data to {pbf_file}")
     pbf_url = get_pbf_url(region, subregion)
 
     resp = httpx.get(pbf_url, follow_redirects=True)
-    with open(pbf_file, 'wb') as f:
+    with open(pbf_file, "wb") as f:
         f.write(resp.content)
 
     resp = httpx.get(f"{pbf_url}.md5", follow_redirects=True)
-    with open(f"{pbf_file}.md5", 'w') as f:
+    with open(f"{pbf_file}.md5", "w") as f:
         f.write(resp.text)
 
 
-def archive_data(pbf_file: str, md5_file: str, pbf_file_with_date: str,
-                 md5_file_with_date: str):
+def archive_data(
+    pbf_file: str, md5_file: str, pbf_file_with_date: str, md5_file_with_date: str
+):
     """Copies `pbf_file` and `md5_file` to `pbf_file_with_date` and
     `md5_file_with_date`.
 
@@ -228,8 +224,9 @@ def archive_data(pbf_file: str, md5_file: str, pbf_file_with_date: str,
         shutil.copy2(md5_file, md5_file_with_date)
 
 
-def unarchive_data(pbf_file: str, md5_file: str, pbf_file_with_date: str,
-                   md5_file_with_date: str):
+def unarchive_data(
+    pbf_file: str, md5_file: str, pbf_file_with_date: str, md5_file_with_date: str
+):
     """Copies `pbf_file_with_date` and `md5_file_with_date`
     to `pbf_file` and `md5_file`.
 
@@ -242,17 +239,17 @@ def unarchive_data(pbf_file: str, md5_file: str, pbf_file_with_date: str,
     pbf_file_with_date : str
     md5_file_with_date : str
     """
-    logger = logging.getLogger('pgosm-flex')
+    logger = logging.getLogger("pgosm-flex")
     if os.path.exists(pbf_file):
-        logger.debug(f'{pbf_file} exists. Overwriting.')
+        logger.debug(f"{pbf_file} exists. Overwriting.")
 
-    logger.debug(f'Copying {pbf_file_with_date} to {pbf_file}')
+    logger.debug(f"Copying {pbf_file_with_date} to {pbf_file}")
     shutil.copy2(pbf_file_with_date, pbf_file)
 
     if os.path.exists(md5_file):
-        logger.debug(f'{md5_file} exists. Overwriting.')
+        logger.debug(f"{md5_file} exists. Overwriting.")
 
-    logger.debug(f'Copying {md5_file_with_date} to {md5_file}')
+    logger.debug(f"Copying {md5_file_with_date} to {md5_file}")
     shutil.copy2(md5_file_with_date, md5_file)
 
 
@@ -268,8 +265,8 @@ def remove_latest_files(out_path: str):
     pbf_filename = get_region_filename()
 
     pbf_file = os.path.join(out_path, pbf_filename)
-    md5_file = f'{pbf_file}.md5'
-    logging.debug(f'Removing {pbf_file}')
+    md5_file = f"{pbf_file}.md5"
+    logging.debug(f"Removing {pbf_file}")
     os.remove(pbf_file)
-    logging.debug(f'Removing {md5_file}')
+    logging.debug(f"Removing {md5_file}")
     os.remove(md5_file)

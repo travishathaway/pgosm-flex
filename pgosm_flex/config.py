@@ -5,16 +5,49 @@ This module provides type-safe configuration with automatic validation,
 supporting multiple configuration sources with clear precedence:
 CLI args > TOML file > Environment variables > Defaults
 """
+
+import contextlib
 import datetime
 import json
 import logging
 import os
+from contextvars import ContextVar
+from importlib import resources
 from pathlib import Path
 from typing import Optional, Literal
 from urllib.parse import quote
 
 from pydantic import BaseModel, Field, field_validator, model_validator, SecretStr
 from pydantic_settings import SettingsConfigDict
+
+_config_context = ContextVar("config", default=None)
+
+
+def get_config() -> "PgOSMFlexConfig | None":
+    """Get PgOSM Flex configuration."""
+    config = _config_context.get()
+    if config is None:
+        raise RuntimeError("Configuration is not initialized")
+    return config
+
+
+def init_config(
+    cli_args: Optional[dict] = None, toml_path: Path = Path("pgosm-flex.toml")
+) -> "PgOSMFlexConfig":
+    """Initialize configuration in current context."""
+    config = ConfigLoader.load(cli_args=cli_args, toml_path=toml_path)
+    _config_context.set(config)
+    return config
+
+
+@contextlib.contextmanager
+def config_context(config: "PgOSMFlexConfig"):
+    """Context manager for testing with different configs."""
+    token = _config_context.set(config)
+    try:
+        yield config
+    finally:
+        _config_context.reset(token)
 
 
 def get_today() -> str:
@@ -24,7 +57,7 @@ def get_today() -> str:
     -------
     today : str
     """
-    return datetime.datetime.today().strftime('%Y-%m-%d')
+    return datetime.datetime.today().strftime("%Y-%m-%d")
 
 
 class DatabaseConfig(BaseModel):
@@ -32,16 +65,14 @@ class DatabaseConfig(BaseModel):
 
     Maps to POSTGRES_* environment variables.
     """
+
     host: str = "localhost"
     port: int = 5432
     database: str = "pgosm"
     user: str = "postgres"
     password: Optional[SecretStr] = None
 
-    model_config = SettingsConfigDict(
-        env_prefix="POSTGRES_",
-        case_sensitive=False
-    )
+    model_config = SettingsConfigDict(env_prefix="POSTGRES_", case_sensitive=False)
 
     @field_validator("port")
     @classmethod
@@ -71,18 +102,18 @@ class DatabaseConfig(BaseModel):
         port = str(self.port)
 
         if admin:
-            db_name = 'postgres' if self.host == 'localhost' else self.database
+            db_name = "postgres" if self.host == "localhost" else self.database
         else:
             db_name = self.database
 
         db_name = quote(db_name)
-        app_str = '?application_name=pgosm-flex'
+        app_str = "?application_name=pgosm-flex"
 
         if self.password is None:
-            return f'postgresql://{user}@{host}:{port}/{db_name}{app_str}'
+            return f"postgresql://{user}@{host}:{port}/{db_name}{app_str}"
         else:
             password = quote(self.password.get_secret_value())
-            return f'postgresql://{user}:{password}@{host}:{port}/{db_name}{app_str}'
+            return f"postgresql://{user}:{password}@{host}:{port}/{db_name}{app_str}"
 
 
 class RegionConfig(BaseModel):
@@ -102,22 +133,22 @@ class RegionConfig(BaseModel):
             return v
         return Path(v)
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def validate_region_or_input(self):
         """Ensure either region or input_file is provided.
 
         Mirrors validation from main.validate_region_inputs().
         """
         if self.region is None and self.input_file is None:
-            raise ValueError('Either region or input_file must be provided')
+            raise ValueError("Either region or input_file must be provided")
 
         if self.region is None and self.subregion is not None:
-            raise ValueError('Cannot use subregion without region')
+            raise ValueError("Cannot use subregion without region")
 
-        if self.region is not None and '/' in self.region and self.subregion is None:
+        if self.region is not None and "/" in self.region and self.subregion is None:
             raise ValueError(
-                'Region provided appears to include subregion. '
-                'Use --subregion to specify subregion separately.'
+                "Region provided appears to include subregion. "
+                "Use --subregion to specify subregion separately."
             )
 
         return self
@@ -136,7 +167,7 @@ class RegionConfig(BaseModel):
         if self.subregion is None:
             return self.region if self.region else str(self.input_file)
         else:
-            return f'{self.region}-{self.subregion}'
+            return f"{self.region}-{self.subregion}"
 
     @property
     def input_file_str(self) -> Optional[str]:
@@ -176,14 +207,14 @@ class LayersetConfig(BaseModel):
         import configparser
 
         if self.layerset_path is None:
-            ini_path = flex_path / 'layerset' / f'{self.layerset}.ini'
+            ini_path = flex_path / "layerset" / f"{self.layerset}.ini"
         else:
-            ini_path = self.layerset_path / f'{self.layerset}.ini'
+            ini_path = self.layerset_path / f"{self.layerset}.ini"
 
         config = configparser.ConfigParser()
         config.read(ini_path)
 
-        return dict(config['layerset'])
+        return dict(config["layerset"])
 
 
 class ImportConfig(BaseModel):
@@ -203,7 +234,7 @@ class ImportConfig(BaseModel):
     append_first_run: bool = True
     run_post_sql: bool = True
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def validate_and_compute(self):
         """Validate mutual exclusivity and compute derived flags.
 
@@ -212,8 +243,8 @@ class ImportConfig(BaseModel):
         # Validate mutual exclusivity
         if self.replication and self.update is not None:
             raise ValueError(
-                'The --replication and --update features are mutually exclusive. '
-                'Use one or the other.'
+                "The --replication and --update features are mutually exclusive. "
+                "Use one or the other."
             )
 
         # Compute slim_no_drop (from set_slim_no_drop)
@@ -222,15 +253,15 @@ class ImportConfig(BaseModel):
         # Compute append_first_run (from set_append_first_run)
         if self.replication_update:
             self.append_first_run = False
-        elif self.update == 'create':
+        elif self.update == "create":
             self.append_first_run = True
-        elif self.update == 'append':
+        elif self.update == "append":
             self.append_first_run = False
         else:
             self.append_first_run = True
 
         # Compute run_post_sql (from set_run_post_sql)
-        self.run_post_sql = (self.update != 'append')
+        self.run_post_sql = self.update != "append"
 
         return self
 
@@ -254,44 +285,46 @@ class ImportConfig(BaseModel):
         """
         from packaging.version import parse as parse_version
 
-        logger = logging.getLogger('pgosm-flex')
-        logger.debug('Checking if it is okay to run...')
+        logger = logging.getLogger("pgosm-flex")
+        logger.debug("Checking if it is okay to run...")
 
         if self.force:
-            logger.warning('Using --force, kiss existing data goodbye.')
+            logger.warning("Using --force, kiss existing data goodbye.")
             return True
 
         # No prior imports - safe to proceed
         if len(prior_import) == 0:
-            logger.debug('No prior import found, okay to proceed.')
+            logger.debug("No prior import found, okay to proceed.")
             return True
 
         # Check version compatibility
-        prior_version = prior_import['pgosm_flex_version_no_hash']
+        prior_version = prior_import["pgosm_flex_version_no_hash"]
         if parse_version(current_version) < parse_version(prior_version):
-            msg = f'PgOSM Flex version ({current_version}) is lower than latest import'
-            msg += f' tracked in the pgosm_flex table ({prior_version}).'
-            msg += f' Use PgOSM Flex version {prior_version} or newer'
+            msg = f"PgOSM Flex version ({current_version}) is lower than latest import"
+            msg += f" tracked in the pgosm_flex table ({prior_version})."
+            msg += f" Use PgOSM Flex version {prior_version} or newer"
             logger.error(msg)
             return False
         else:
-            logger.info(f'Prior import used PgOSM Flex: {prior_version}')
+            logger.info(f"Prior import used PgOSM Flex: {prior_version}")
 
         # Check replication compatibility
-        prior_replication = prior_import['replication']
+        prior_replication = prior_import["replication"]
         if self.replication:
             if not prior_replication:
-                logger.error('Running w/ replication but prior import did not. Requires --force to proceed.')
+                logger.error(
+                    "Running w/ replication but prior import did not. Requires --force to proceed."
+                )
                 return False
-            logger.debug('Okay to proceed with replication')
+            logger.debug("Okay to proceed with replication")
             return True
 
         # Allow append mode
-        if self.update == 'append':
+        if self.update == "append":
             return True
 
         # Default: require --force if prior data exists
-        msg = 'Prior data exists in the osm schema and --force was not used.'
+        msg = "Prior data exists in the osm schema and --force was not used."
         logger.error(msg)
         return False
 
@@ -305,14 +338,16 @@ class ImportConfig(BaseModel):
         str
             JSON string representation of import configuration
         """
-        return json.dumps({
-            'update': self.update,
-            'replication': self.replication,
-            'replication_update': self.replication_update,
-            'append_first_run': self.append_first_run,
-            'slim_no_drop': self.slim_no_drop,
-            'run_post_sql': self.run_post_sql
-        })
+        return json.dumps(
+            {
+                "update": self.update,
+                "replication": self.replication,
+                "replication_update": self.replication_update,
+                "append_first_run": self.append_first_run,
+                "slim_no_drop": self.slim_no_drop,
+                "run_post_sql": self.run_post_sql,
+            }
+        )
 
 
 class ProcessingConfig(BaseModel):
@@ -322,7 +357,7 @@ class ProcessingConfig(BaseModel):
     srid: str = "3857"  # helpers.DEFAULT_SRID
     language: Optional[str] = None
     schema_name: str = "osm"
-    base_path: Optional[Path] = None
+    base_path: Optional[Path] = resources.files("pgosm_flex")
     debug: bool = False
 
     @field_validator("ram")
@@ -357,9 +392,7 @@ class PgOSMFlexConfig(BaseModel):
     processing: ProcessingConfig
 
     model_config = SettingsConfigDict(
-        env_prefix="PGOSM_",
-        env_nested_delimiter="__",
-        extra="forbid"
+        env_prefix="PGOSM_", env_nested_delimiter="__", extra="forbid"
     )
 
     def to_env_vars(self) -> dict[str, str]:
@@ -377,34 +410,34 @@ class PgOSMFlexConfig(BaseModel):
 
         # Region settings
         if self.region.region:
-            env['PGOSM_REGION'] = self.region.region
+            env["PGOSM_REGION"] = self.region.region
         if self.region.subregion:
-            env['PGOSM_SUBREGION'] = self.region.subregion
+            env["PGOSM_SUBREGION"] = self.region.subregion
         if self.processing.srid != "3857":
-            env['PGOSM_SRID'] = self.processing.srid
+            env["PGOSM_SRID"] = self.processing.srid
         if self.processing.language:
-            env['PGOSM_LANGUAGE'] = self.processing.language
+            env["PGOSM_LANGUAGE"] = self.processing.language
 
-        env['PGOSM_DATE'] = self.region.pgosm_date
-        env['PGOSM_LAYERSET'] = self.layerset.layerset
+        env["PGOSM_DATE"] = self.region.pgosm_date
+        env["PGOSM_LAYERSET"] = self.layerset.layerset
 
         if self.layerset.layerset_path:
-            env['PGOSM_LAYERSET_PATH'] = str(self.layerset.layerset_path)
+            env["PGOSM_LAYERSET_PATH"] = str(self.layerset.layerset_path)
 
-        env['SCHEMA_NAME'] = self.processing.schema_name
-        env['SKIP_NESTED'] = str(self.import_mode.skip_nested)
+        env["SCHEMA_NAME"] = self.processing.schema_name
+        env["SKIP_NESTED"] = str(self.import_mode.skip_nested)
 
         # Database connections
-        env['PGOSM_CONN'] = self.database.connection_string()
-        env['PGOSM_CONN_PG'] = self.database.connection_string(admin=True)
+        env["PGOSM_CONN"] = self.database.connection_string()
+        env["PGOSM_CONN_PG"] = self.database.connection_string(admin=True)
 
         # PostgreSQL variables
-        env['POSTGRES_USER'] = self.database.user
-        env['POSTGRES_HOST'] = self.database.host
-        env['POSTGRES_PORT'] = str(self.database.port)
-        env['POSTGRES_DB'] = self.database.database
+        env["POSTGRES_USER"] = self.database.user
+        env["POSTGRES_HOST"] = self.database.host
+        env["POSTGRES_PORT"] = str(self.database.port)
+        env["POSTGRES_DB"] = self.database.database
         if self.database.password:
-            env['POSTGRES_PASSWORD'] = self.database.password.get_secret_value()
+            env["POSTGRES_PASSWORD"] = self.database.password.get_secret_value()
 
         return env
 
@@ -454,50 +487,52 @@ class ConfigLoader:
             Nested configuration dictionary from environment variables
         """
         config = {
-            'database': {},
-            'region': {},
-            'layerset': {},
-            'import_mode': {},
-            'processing': {}
+            "database": {},
+            "region": {},
+            "layerset": {},
+            "import_mode": {},
+            "processing": {},
         }
 
         # Database config
-        if 'POSTGRES_HOST' in os.environ:
-            config['database']['host'] = os.environ['POSTGRES_HOST']
-        if 'POSTGRES_PORT' in os.environ:
-            config['database']['port'] = int(os.environ['POSTGRES_PORT'])
-        if 'POSTGRES_DB' in os.environ:
-            config['database']['database'] = os.environ['POSTGRES_DB']
-        if 'POSTGRES_USER' in os.environ:
-            config['database']['user'] = os.environ['POSTGRES_USER']
-        if 'POSTGRES_PASSWORD' in os.environ:
-            config['database']['password'] = os.environ['POSTGRES_PASSWORD']
+        if "POSTGRES_HOST" in os.environ:
+            config["database"]["host"] = os.environ["POSTGRES_HOST"]
+        if "POSTGRES_PORT" in os.environ:
+            config["database"]["port"] = int(os.environ["POSTGRES_PORT"])
+        if "POSTGRES_DB" in os.environ:
+            config["database"]["database"] = os.environ["POSTGRES_DB"]
+        if "POSTGRES_USER" in os.environ:
+            config["database"]["user"] = os.environ["POSTGRES_USER"]
+        if "POSTGRES_PASSWORD" in os.environ:
+            config["database"]["password"] = os.environ["POSTGRES_PASSWORD"]
 
         # Region config
-        if 'PGOSM_REGION' in os.environ:
-            config['region']['region'] = os.environ['PGOSM_REGION']
-        if 'PGOSM_SUBREGION' in os.environ:
-            config['region']['subregion'] = os.environ['PGOSM_SUBREGION']
-        if 'PGOSM_DATE' in os.environ:
-            config['region']['pgosm_date'] = os.environ['PGOSM_DATE']
+        if "PGOSM_REGION" in os.environ:
+            config["region"]["region"] = os.environ["PGOSM_REGION"]
+        if "PGOSM_SUBREGION" in os.environ:
+            config["region"]["subregion"] = os.environ["PGOSM_SUBREGION"]
+        if "PGOSM_DATE" in os.environ:
+            config["region"]["pgosm_date"] = os.environ["PGOSM_DATE"]
 
         # Layerset config
-        if 'PGOSM_LAYERSET' in os.environ:
-            config['layerset']['layerset'] = os.environ['PGOSM_LAYERSET']
-        if 'PGOSM_LAYERSET_PATH' in os.environ:
-            config['layerset']['layerset_path'] = os.environ['PGOSM_LAYERSET_PATH']
+        if "PGOSM_LAYERSET" in os.environ:
+            config["layerset"]["layerset"] = os.environ["PGOSM_LAYERSET"]
+        if "PGOSM_LAYERSET_PATH" in os.environ:
+            config["layerset"]["layerset_path"] = os.environ["PGOSM_LAYERSET_PATH"]
 
         # Processing config
-        if 'PGOSM_SRID' in os.environ:
-            config['processing']['srid'] = os.environ['PGOSM_SRID']
-        if 'PGOSM_LANGUAGE' in os.environ:
-            config['processing']['language'] = os.environ['PGOSM_LANGUAGE']
-        if 'SCHEMA_NAME' in os.environ:
-            config['processing']['schema_name'] = os.environ['SCHEMA_NAME']
+        if "PGOSM_SRID" in os.environ:
+            config["processing"]["srid"] = os.environ["PGOSM_SRID"]
+        if "PGOSM_LANGUAGE" in os.environ:
+            config["processing"]["language"] = os.environ["PGOSM_LANGUAGE"]
+        if "SCHEMA_NAME" in os.environ:
+            config["processing"]["schema_name"] = os.environ["SCHEMA_NAME"]
 
         # Import mode config
-        if 'SKIP_NESTED' in os.environ:
-            config['import_mode']['skip_nested'] = os.environ['SKIP_NESTED'].lower() == 'true'
+        if "SKIP_NESTED" in os.environ:
+            config["import_mode"]["skip_nested"] = (
+                os.environ["SKIP_NESTED"].lower() == "true"
+            )
 
         return config
 
@@ -519,7 +554,11 @@ class ConfigLoader:
 
         for config in configs:
             for key, value in config.items():
-                if isinstance(value, dict) and key in result and isinstance(result[key], dict):
+                if (
+                    isinstance(value, dict)
+                    and key in result
+                    and isinstance(result[key], dict)
+                ):
                     # Recursively merge nested dicts
                     result[key] = ConfigLoader.merge_configs(result[key], value)
                 else:
@@ -529,9 +568,9 @@ class ConfigLoader:
         return result
 
     @classmethod
-    def load(cls,
-             cli_args: Optional[dict] = None,
-             toml_path: Path = Path("pgosm-flex.toml")) -> PgOSMFlexConfig:
+    def load(
+        cls, cli_args: Optional[dict] = None, toml_path: Path = Path("pgosm-flex.toml")
+    ) -> PgOSMFlexConfig:
         """Load configuration with precedence: CLI > TOML > Env > Defaults.
 
         Parameters
@@ -546,15 +585,15 @@ class ConfigLoader:
         PgOSMFlexConfig
             Fully loaded and validated configuration
         """
-        logger = logging.getLogger('pgosm-flex')
+        logger = logging.getLogger("pgosm-flex")
 
         # Load from each source
         env_config = cls.load_env_vars()
-        logger.debug(f'Loaded env config: {len(env_config)} sections')
+        logger.debug(f"Loaded env config: {len(env_config)} sections")
 
         toml_config = cls.load_toml(toml_path)
         if toml_config:
-            logger.info(f'Loaded TOML config from {toml_path}')
+            logger.info(f"Loaded TOML config from {toml_path}")
 
         cli_config = cls.cli_args_to_dict(cli_args) if cli_args else {}
 
@@ -564,10 +603,10 @@ class ConfigLoader:
         # Create and validate config object
         try:
             config = PgOSMFlexConfig(**merged)
-            logger.debug('Configuration validated successfully')
+            logger.debug("Configuration validated successfully")
             return config
         except Exception as e:
-            logger.error(f'Configuration validation failed: {e}')
+            logger.error(f"Configuration validation failed: {e}")
             raise
 
     @staticmethod
@@ -585,37 +624,39 @@ class ConfigLoader:
             Nested configuration dictionary
         """
         config = {
-            'database': {},
-            'region': {},
-            'layerset': {},
-            'import_mode': {},
-            'processing': {}
+            "database": {},
+            "region": {},
+            "layerset": {},
+            "import_mode": {},
+            "processing": {},
         }
 
         # Map CLI args to config sections
         mapping = {
-            'region': ('region', 'region'),
-            'subregion': ('region', 'subregion'),
-            'input_file': ('region', 'input_file'),
-            'pgosm_date': ('region', 'pgosm_date'),
-            'skip_verify_checksum': ('region', 'skip_verify_checksum'),
-
-            'layerset': ('layerset', 'layerset'),
-            'layerset_path': ('layerset', 'layerset_path'),
-
-            'force': ('import_mode', 'force'),
-            'replication': ('import_mode', 'replication'),
-            'update': ('import_mode', 'update'),
-            'skip_nested': ('import_mode', 'skip_nested'),
-            'skip_qgis_style': ('import_mode', 'skip_qgis_style'),
-            'pg_dump': ('import_mode', 'pg_dump'),
-
-            'ram': ('processing', 'ram'),
-            'srid': ('processing', 'srid'),
-            'language': ('processing', 'language'),
-            'schema_name': ('processing', 'schema_name'),
-            'base_path': ('processing', 'base_path'),
-            'debug': ('processing', 'debug'),
+            "pg_user": ("database", "user"),
+            "pg_dbname": ("database", "database"),
+            "pg_host": ("database", "host"),
+            "pg_port": ("database", "port"),
+            "pg_password": ("database", "password"),
+            "region": ("region", "region"),
+            "subregion": ("region", "subregion"),
+            "input_file": ("region", "input_file"),
+            "pgosm_date": ("region", "pgosm_date"),
+            "skip_verify_checksum": ("region", "skip_verify_checksum"),
+            "layerset": ("layerset", "layerset"),
+            "layerset_path": ("layerset", "layerset_path"),
+            "force": ("import_mode", "force"),
+            "replication": ("import_mode", "replication"),
+            "update": ("import_mode", "update"),
+            "skip_nested": ("import_mode", "skip_nested"),
+            "skip_qgis_style": ("import_mode", "skip_qgis_style"),
+            "pg_dump": ("import_mode", "pg_dump"),
+            "ram": ("processing", "ram"),
+            "srid": ("processing", "srid"),
+            "language": ("processing", "language"),
+            "schema_name": ("processing", "schema_name"),
+            "base_path": ("processing", "base_path"),
+            "debug": ("processing", "debug"),
         }
 
         for cli_key, (section, config_key) in mapping.items():

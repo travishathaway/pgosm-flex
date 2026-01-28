@@ -70,5 +70,6 @@ osm2pgsql = ">=2"
 coverage = ">=7.13.1"
 pytest = ">=7.0"
 pytest-timeout = ">=2.1"
+pytest-mock = ">=3.15.1,<4"
 
 [tool.pixi.tasks]

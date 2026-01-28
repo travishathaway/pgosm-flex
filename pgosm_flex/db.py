@@ -6,71 +6,19 @@ data. At a glance, this is vulnerable to SQLi (SQL Injection) considering the
 a concern for this project because the user inputting the ``schema_name`` value
 is considered a trusted user.
 """
+
 import logging
 import os
 import sys
 import subprocess
 import time
 import psycopg
-import sh
-from urllib import parse
 from psycopg import sql
 
-from . import qgis_styles
+from . import qgis_styles, __version__
+from .config import get_config
 
-LOGGER = logging.getLogger('pgosm-flex')
-
-
-def connection_string(admin: bool=False) -> str:
-    """Returns connection string to `db_name`.
-
-    Env vars for user/password defined by Postgres docker image.
-    https://hub.docker.com/_/postgres/
-
-    * POSTGRES_PASSWORD
-    * POSTGRES_USER
-    * POSTGRES_HOST
-    * POSTGRES_DB
-
-    Parameters
-    --------------------------
-    admin : boolean
-        Default False. Set to True to connect to admin database, currently
-        hard-coded to `postgres`
-
-    Returns
-    --------------------------
-    conn_string : str
-    """
-    app_str = '?application_name=pgosm-flex'
-
-    pg_details = pg_conn_parts()
-    pg_user = parse.quote(pg_details['pg_user'])
-    try:
-        pg_pass = parse.quote(pg_details['pg_pass'])
-    except TypeError:
-        pg_pass = None
-    pg_host = parse.quote(pg_details['pg_host'])
-    pg_db = parse.quote(pg_details['pg_db'])
-    pg_port = parse.quote(pg_details['pg_port'])
-
-    if admin:
-        if pg_host == 'localhost':
-            db_name = 'postgres'
-        else:
-            # External databases only use admin connection for version check.
-            # Can connect to main data DB for this, `postgres` db not required.
-            # Should allow connection even when `postgres` database does not exist.
-            db_name = pg_db
-    else:
-        db_name = pg_db
-
-    if pg_pass is None:
-        conn_string = f'postgresql://{pg_user}@{pg_host}:{pg_port}/{db_name}{app_str}'
-    else:
-        conn_string = f'postgresql://{pg_user}:{pg_pass}@{pg_host}:{pg_port}/{db_name}{app_str}'
-
-    return conn_string
+LOGGER = logging.getLogger("pgosm-flex")
 
 
 def pg_conn_parts() -> dict:
@@ -82,52 +30,56 @@ def pg_conn_parts() -> dict:
     pg_details : dict
     """
     try:
-        pg_user = os.environ['POSTGRES_USER']
+        pg_user = os.environ["POSTGRES_USER"]
     except KeyError:
-        LOGGER.debug('POSTGRES_USER not configured. Defaulting to postgres')
-        pg_user = 'postgres'
+        LOGGER.debug("POSTGRES_USER not configured. Defaulting to postgres")
+        pg_user = "postgres"
 
     try:
-        pg_pass = os.environ['POSTGRES_PASSWORD']
-        if pg_pass == '':
+        pg_pass = os.environ["POSTGRES_PASSWORD"]
+        if pg_pass == "":
             pg_pass = None
     except KeyError:
-        LOGGER.debug('POSTGRES_PASSWORD not configured. Should work if ~/.pgpass is configured.')
+        LOGGER.debug(
+            "POSTGRES_PASSWORD not configured. Should work if ~/.pgpass is configured."
+        )
         pg_pass = None
 
     try:
-        pg_host = os.environ['POSTGRES_HOST']
+        pg_host = os.environ["POSTGRES_HOST"]
     except KeyError:
-        pg_host = 'localhost'
-        LOGGER.debug(f'POSTGRES_HOST not configured. Defaulting to {pg_host}')
+        pg_host = "localhost"
+        LOGGER.debug(f"POSTGRES_HOST not configured. Defaulting to {pg_host}")
 
     try:
-        pg_port = os.environ['POSTGRES_PORT']
+        pg_port = os.environ["POSTGRES_PORT"]
     except KeyError:
-        pg_port = '5432'
-        LOGGER.debug(f'POSTGRES_HOST not configured. Defaulting to {pg_port}')
+        pg_port = "5432"
+        LOGGER.debug(f"POSTGRES_HOST not configured. Defaulting to {pg_port}")
 
-    LOGGER.debug(f'PG Host: {pg_host} -- Port: {pg_port}')
+    LOGGER.debug(f"PG Host: {pg_host} -- Port: {pg_port}")
 
-    default_db = 'pgosm'
+    default_db = "pgosm"
     pg_db = None
 
     try:
-        pg_db = os.environ['POSTGRES_DB']
+        pg_db = os.environ["POSTGRES_DB"]
     except KeyError:
-        LOGGER.debug(f'POSTGRES_DB not set.  Using default {default_db}')
+        LOGGER.debug(f"POSTGRES_DB not set.  Using default {default_db}")
 
     if pg_db is None:
         pg_db = default_db
 
-    LOGGER.debug(f'DB Name: {pg_db}')
-    os.environ['POSTGRES_DB'] = pg_db
+    LOGGER.debug(f"DB Name: {pg_db}")
+    os.environ["POSTGRES_DB"] = pg_db
 
-    pg_details = {'pg_user': pg_user,
-                  'pg_pass': pg_pass,
-                  'pg_host': pg_host,
-                  'pg_port': pg_port,
-                  'pg_db': pg_db}
+    pg_details = {
+        "pg_user": pg_user,
+        "pg_pass": pg_pass,
+        "pg_host": pg_host,
+        "pg_port": pg_port,
+        "pg_db": pg_db,
+    }
 
     return pg_details
 
@@ -139,8 +91,8 @@ def wait_for_postgres():
     after starting.  Calls `sys.exit()` after `max_loops` reached
     indicating failure due to inability to connect.
     """
-    logger = logging.getLogger('pgosm-flex')
-    logger.info('Checking for Postgres service to be available')
+    logger = logging.getLogger("pgosm-flex")
+    logger.info("Checking for Postgres service to be available")
     log_pg_details()
 
     required_checks = 2
@@ -151,7 +103,7 @@ def wait_for_postgres():
 
     while found < required_checks:
         if i > max_loops:
-            err = 'Postgres still has not started. Exiting.'
+            err = "Postgres still has not started. Exiting."
             logger.error(err)
             sys.exit()
 
@@ -159,14 +111,14 @@ def wait_for_postgres():
 
         if pg_isready():
             found += 1
-            logger.debug(f'Postgres up {found} times')
+            logger.debug(f"Postgres up {found} times")
 
         if i % 5 == 0:
-            logger.debug('Waiting for Postgres connection...')
+            logger.debug("Waiting for Postgres connection...")
 
         i += 1
 
-    logger.info('Postgres instance ready')
+    logger.info("Postgres instance ready")
 
 
 def pg_isready() -> bool:
@@ -181,9 +133,9 @@ def pg_isready() -> bool:
     try:
         result = pg_version_check()
     except AttributeError:
-        err_msg = 'Error checking version, likely waiting for Postgres to start.'
-        err_msg += ' Only an error if it does not go away after a few attempts.'
-        logging.getLogger('pgosm-flex').warning(err_msg)
+        err_msg = "Error checking version, likely waiting for Postgres to start."
+        err_msg += " Only an error if it does not go away after a few attempts."
+        logging.getLogger("pgosm-flex").warning(err_msg)
         return False
 
     if result is None:
@@ -192,20 +144,20 @@ def pg_isready() -> bool:
 
 
 def log_pg_details():
-    """Logs non-sensitive Postgres connection details to LOGGER.
-    """
-    conn_parts = pg_conn_parts()
-    pg_host = conn_parts['pg_host']
-    pg_port = conn_parts['pg_port']
-    db_name = conn_parts['pg_db']
-    pg_user = conn_parts['pg_user']
+    """Logs non-sensitive Postgres connection details to LOGGER."""
+    config = get_config()
+    pg_host = config.database.host
+    pg_port = config.database.port
+    db_name = config.database.database
+    pg_user = config.database.user
+
     msg = f'Connecting to Postgres using role "{pg_user}" on host '
     msg += f' "{pg_host}:{pg_port}"'
     msg += f'  in database "{db_name}"'
     LOGGER.info(msg)
 
 
-def prepare_pgosm_db(skip_qgis_style, db_path, import_mode, schema_name):
+def prepare_pgosm_db(db_path):
     """Runs through steps to prepare the target database for PgOSM Flex.
 
     Includes additional preparation for using --replication and --updated=append
@@ -213,84 +165,85 @@ def prepare_pgosm_db(skip_qgis_style, db_path, import_mode, schema_name):
 
     Parameters
     --------------------------
-    skip_qgis_style : bool
     db_path : str
-    import_mode : import_mode.ImportMode
-    schema_name : str
-        Schema name for OpenStreetMap data
     """
-    if pg_conn_parts()['pg_host'] == 'localhost':
+    config = get_config()
+
+    # TODO: there's probably a more robust way to check for localhost (what about 127.0.0.1?)
+    if config.database.host == "localhost":
         drop_it = True
-        LOGGER.debug('Running standard database prep for in-Docker operation. Includes DROP/CREATE DATABASE')
-        LOGGER.debug(f'import_mode: {import_mode.as_json()}')
-        if import_mode.slim_no_drop:
-            if not import_mode.append_first_run:
+        LOGGER.debug(
+            "Running standard database prep for localhost database. Includes DROP/CREATE DATABASE"
+        )
+        LOGGER.debug(f"import_mode: {config.import_mode.as_json()}")
+        if config.import_mode.slim_no_drop:
+            if not config.import_mode.append_first_run:
                 drop_it = False
-            if import_mode.replication_update:
+            if config.import_mode.replication_update:
                 drop_it = False
 
         if drop_it:
-            LOGGER.debug('Dropping local database if exists')
+            LOGGER.debug("Dropping local database if exists")
             drop_pgosm_db()
         else:
-            LOGGER.debug('Not dropping local DB. This is expected with subsequent import via --replication OR --update=append.')
+            LOGGER.debug(
+                "Not dropping local DB. This is expected with subsequent import via --replication OR --update=append."
+            )
 
         create_pgosm_db()
 
     else:
-        LOGGER.info('Using external database. Ensure the target database is setup properly with proper permissions.')
+        LOGGER.info(
+            "Using external database. Ensure the target database is setup properly with proper permissions."
+        )
 
-    prepare_osm_schema(db_path=db_path, skip_qgis_style=skip_qgis_style,
-                       schema_name=schema_name)
-    run_insert_pgosm_road(db_path=db_path, schema_name=schema_name)
+    prepare_osm_schema(db_path=db_path)
+    run_insert_pgosm_road(db_path=db_path, schema_name=config.processing.schema_name)
 
-    if import_mode.replication_update or import_mode.update == 'append':
+    if config.import_mode.replication_update or config.import_mode.update == "append":
         osm2pgsql_replication_start()
 
 
-def start_import(pgosm_region, pgosm_date, srid, language, layerset, version_info,
-                 osm2pgsql_version, import_mode, schema_name, input_file):
+def start_import(osm2pgsql_version, schema_name):
     """Creates record in osm.pgosm_flex table.
 
     Parameters
     ---------------------------
-    pgosm_region : str
-    pgosm_date : str (ish?)
-    srid : str
-    language : str
-    layerset : str
-    git_info : str
     osm2pgsql_version : str
-    import_mode : import_mode.ImportMode
-    schema_name : str
-    input_file : str
 
     Returns
     ----------------------------
     import_id : int
         Value from the `id` column in `osm.pgosm_flex`.
     """
-    params = {'pgosm_region': pgosm_region, 'pgosm_date': pgosm_date,
-              'srid': srid, 'language': language, 'layerset': layerset,
-              'git_info': version_info, 'osm2pgsql_version': osm2pgsql_version,
-              'import_mode': import_mode.as_json(),
-              'input_file': input_file}
+    config = get_config()
+    params = {
+        "pgosm_region": config.region.region,
+        "pgosm_date": config.region.pgosm_date,
+        "srid": config.processing.srid,
+        "language": config.processing.language,
+        "layerset": config.layerset.layerset,
+        "git_info": __version__,
+        "osm2pgsql_version": osm2pgsql_version,
+        "import_mode": config.import_mode.as_json(),
+        "input_file": config.region.input_file,
+    }
 
     sql_raw = """
-INSERT INTO {schema_name}.pgosm_flex
-    (osm_date, region, pgosm_flex_version, srid,
-        osm2pgsql_version, "language", import_mode,
-        layerset, input_file)
-    VALUES(%(pgosm_date)s, %(pgosm_region)s, %(git_info)s, %(srid)s,
-        %(osm2pgsql_version)s,
-        COALESCE(%(language)s, ''), %(import_mode)s, %(layerset)s,
-        %(input_file)s
-        )
-    RETURNING id
-;
-"""
-    sql_raw = sql_raw.format(schema_name=schema_name)
-    with get_db_conn(conn_string=os.environ['PGOSM_CONN']) as conn:
+        INSERT INTO {schema_name}.pgosm_flex
+            (osm_date, region, pgosm_flex_version, srid,
+                osm2pgsql_version, "language", import_mode,
+                layerset, input_file)
+            VALUES(%(pgosm_date)s, %(pgosm_region)s, %(git_info)s, %(srid)s,
+                %(osm2pgsql_version)s,
+                COALESCE(%(language)s, ''), %(import_mode)s, %(layerset)s,
+                %(input_file)s
+                )
+            RETURNING id
+        ;
+    """
+    sql_raw = sql_raw.format(schema_name=config.processing.schema_name)
+    with get_db_conn(conn_string=config.database.connection_string()) as conn:
         cur = conn.cursor()
         cur.execute(sql_raw, params=params)
         import_id = cur.fetchone()[0]
@@ -308,12 +261,13 @@ def pg_version_check():
     pg_version : int
     """
     sql_raw = """
-SELECT setting
-    FROM pg_catalog.pg_settings
-    WHERE name = 'server_version_num'
-;"""
+        SELECT setting
+            FROM pg_catalog.pg_settings
+            WHERE name = 'server_version_num'
+    """
+    config = get_config()
 
-    with get_db_conn(conn_string=os.environ['PGOSM_CONN_PG']) as conn:
+    with get_db_conn(conn_string=config.database.connection_string()) as conn:
         cur = conn.cursor()
         cur.execute(sql_raw)
         results = cur.fetchone()
@@ -321,7 +275,7 @@ SELECT setting
     # It's an int https://www.postgresql.org/docs/current/runtime-config-preset.html#GUC-SERVER-VERSION-NUM
     pg_version = int(results[0])
     if pg_version < 120000:
-        err_msg = f'Postgres version {pg_version} not supported. Postgres 12+ required.'
+        err_msg = f"Postgres version {pg_version} not supported. Postgres 12+ required."
         LOGGER.error(err_msg)
         sys.exit(9)
 
@@ -337,61 +291,49 @@ def drop_pgosm_db():
     ------------------------
     status : bool
     """
-    conn_parts = pg_conn_parts()
+    config = get_config()
 
-    if not conn_parts['pg_host'] == 'localhost':
-        LOGGER.error('Attempted to drop database external from Docker. Not doing that')
-        return False
+    sql_stmt = sql.SQL("DROP DATABASE IF EXISTS {}").format(
+        sql.Identifier(config.database.database)
+    )
 
-    sql_stmt =  sql.SQL('DROP DATABASE IF EXISTS {}').format(sql.Identifier(conn_parts['pg_db']))
-
-    conn = get_db_conn(conn_string=os.environ['PGOSM_CONN_PG'])
+    conn = get_db_conn(conn_string=config.database.connection_string())
     conn.autocommit = True
 
-    LOGGER.debug('Setting Pg conn to enable autocommit - required for drop/create DB')
+    LOGGER.debug("Setting Pg conn to enable autocommit - required for drop/create DB")
 
     conn.execute(sql_stmt)
 
     conn.close()
-    LOGGER.info('Removed pgosm database')
-
-    return True
+    LOGGER.info("Removed pgosm database")
 
 
 def create_pgosm_db():
     """Creates the pgosm database and prepares with PostGIS and osm schema
 
-    Intentionally hard coded to `pgosm` database for in-Docker use only.
-
     Returns
     -----------------------
     status : bool
     """
-    conn_parts = pg_conn_parts()
+    config = get_config()
 
-    if not conn_parts['pg_host'] == 'localhost':
-        LOGGER.error('Attempted to create database external from Docker. Not doing that')
-        return False
+    sql_stmt = sql.SQL("CREATE DATABASE {}").format(sql.Identifier(config.database.database))
 
-    sql_stmt =  sql.SQL('CREATE DATABASE {}').format(sql.Identifier(conn_parts['pg_db']))
+    conn = get_db_conn(conn_string=config.database.connection_string())
 
-    conn = get_db_conn(conn_string=os.environ['PGOSM_CONN_PG'])
-
-    LOGGER.debug('Setting Pg conn to enable autocommit - required for drop/create DB')
+    LOGGER.debug("Setting Pg conn to enable autocommit - required for drop/create DB")
     conn.autocommit = True
 
     try:
         conn.execute(sql_stmt)
-        LOGGER.info('Created pgosm database')
+        LOGGER.info("Created pgosm database")
     except psycopg.errors.DuplicateDatabase:
-        LOGGER.info('Database already existed.')
+        LOGGER.info("Database already existed.")
     finally:
         conn.close()
 
-    return True
 
-
-def prepare_osm_schema(db_path: str, skip_qgis_style: bool, schema_name: str):
+def prepare_osm_schema(db_path: str):
     """Runs deploy scripts to prepare the PgOSM Flex database.
 
     This function's code could be simplified, but currently I like the verbosity
@@ -404,25 +346,46 @@ def prepare_osm_schema(db_path: str, skip_qgis_style: bool, schema_name: str):
     skip_qgis_style : bool
     scheme_name : str
     """
-    LOGGER.info(f'Preparing database schema: {schema_name}')
-    create_osm_file = 'osm.sql'
-    create_osm_pgosm_flex_file = 'osm_pgosm_flex.sql'
-    create_pgosm_road_file = 'pgosm_road.sql'
-    create_replication_functions = 'replication_functions.sql'
-    create_routing_functions = 'routing_functions.sql'
+    config = get_config()
 
-    run_deploy_file(db_path=db_path, sql_filename=create_osm_file, schema_name=schema_name)
-    run_deploy_file(db_path=db_path, sql_filename=create_osm_pgosm_flex_file, schema_name=schema_name)
-    run_deploy_file(db_path=db_path, sql_filename=create_pgosm_road_file, schema_name=schema_name)
-    run_deploy_file(db_path=db_path, sql_filename=create_replication_functions, schema_name=schema_name)
-    run_deploy_file(db_path=db_path, sql_filename=create_routing_functions, schema_name=schema_name)
+    LOGGER.info(f"Preparing database schema: {config.processing.schema_name}")
+    create_osm_file = "osm.sql"
+    create_osm_pgosm_flex_file = "osm_pgosm_flex.sql"
+    create_pgosm_road_file = "pgosm_road.sql"
+    create_replication_functions = "replication_functions.sql"
+    create_routing_functions = "routing_functions.sql"
 
-    if skip_qgis_style:
-        LOGGER.info('Skipping QGIS styles')
+    run_deploy_file(
+        db_path=db_path,
+        sql_filename=create_osm_file,
+        schema_name=config.processing.schema_name
+    )
+    run_deploy_file(
+        db_path=db_path,
+        sql_filename=create_osm_pgosm_flex_file,
+        schema_name=config.processing.schema_name,
+    )
+    run_deploy_file(
+        db_path=db_path,
+        sql_filename=create_pgosm_road_file,
+        schema_name=config.processing.schema_name
+    )
+    run_deploy_file(
+        db_path=db_path,
+        sql_filename=create_replication_functions,
+        schema_name=config.processing.schema_name,
+    )
+    run_deploy_file(
+        db_path=db_path,
+        sql_filename=create_routing_functions,
+        schema_name=config.processing.schema_name,
+    )
+
+    if config.import_mode.skip_qgis_style:
+        LOGGER.info("Skipping QGIS styles")
     else:
-        LOGGER.info('Loading QGIS styles')
-        qgis_styles.load_qgis_styles(db_path=db_path,
-                                     db_name=pg_conn_parts()['pg_db'])
+        LOGGER.info("Loading QGIS styles")
+        qgis_styles.load_qgis_styles(db_path=db_path, db_name=config.database.database)
 
 
 def run_insert_pgosm_road(db_path: str, schema_name: str):
@@ -434,13 +397,18 @@ def run_insert_pgosm_road(db_path: str, schema_name: str):
     schema_name : str
         Schema name for OpenStreetMap data
     """
-    sql_filename = 'roads-us.sql'
-    run_deploy_file(db_path=db_path, sql_filename=sql_filename,
-                    schema_name=schema_name, subfolder='data')
+    sql_filename = "roads-us.sql"
+    run_deploy_file(
+        db_path=db_path,
+        sql_filename=sql_filename,
+        schema_name=schema_name,
+        subfolder="data",
+    )
 
 
-def run_deploy_file(db_path: str, sql_filename: str, schema_name: str,
-                    subfolder: str='deploy'):
+def run_deploy_file(
+    db_path: str, sql_filename: str, schema_name: str, subfolder: str = "deploy"
+):
     """Run a SQL script under the deploy path.  Used to setup PgOSM Flex DB.
 
     Parameters
@@ -454,18 +422,19 @@ def run_deploy_file(db_path: str, sql_filename: str, schema_name: str,
     schema_name : str
         Schema name for OpenStreetMap data
     """
+    config = get_config()
     full_path = os.path.join(db_path, subfolder, sql_filename)
-    LOGGER.info(f'Deploying {full_path}')
+    LOGGER.info(f"Deploying {full_path}")
 
     with open(full_path) as f:
         deploy_sql = f.read()
 
     deploy_sql = deploy_sql.format(schema_name=schema_name)
 
-    with get_db_conn(conn_string=os.environ['PGOSM_CONN']) as conn:
+    with get_db_conn(conn_string=config.database.connection_string()) as conn:
         cur = conn.cursor()
         cur.execute(deploy_sql)
-        LOGGER.debug(f'Ran SQL in {sql_filename}')
+        LOGGER.debug(f"Ran SQL in {sql_filename}")
 
 
 def get_db_conn(conn_string):
@@ -481,17 +450,18 @@ def get_db_conn(conn_string):
     """
     try:
         conn = psycopg.connect(conn_string)
-        LOGGER.debug('Connection to Postgres established')
+        LOGGER.debug("Connection to Postgres established")
     except psycopg.OperationalError as err:
-        err_msg = 'Database connection error. Error: {}'.format(err)
+        err_msg = "Database connection error. Error: {}".format(err)
         LOGGER.error(err_msg)
-        return False
+        raise err
 
     return conn
 
 
-def run_post_processing_sql(flex_path: str, layer_name: str, schema_name: str,
-                           conn_string: str) -> bool:
+def run_post_processing_sql(
+    flex_path: str, layer_name: str, schema_name: str, conn_string: str
+) -> bool:
     """Executes post-processing SQL file for a specific layer.
 
     Parameters
@@ -510,38 +480,43 @@ def run_post_processing_sql(flex_path: str, layer_name: str, schema_name: str,
     bool
         True if SQL executed successfully, False on error
     """
-    sql_file_path = os.path.join(flex_path, 'sql', f'{layer_name}.sql')
+    sql_file_path = os.path.join(flex_path, "sql", f"{layer_name}.sql")
 
     try:
-        LOGGER.info(f'Processing layer: {layer_name}')
+        LOGGER.info(f"Processing layer: {layer_name}")
 
-        with open(sql_file_path, 'r') as f:
+        with open(sql_file_path, "r") as f:
             sql_content = f.read()
 
         # Schema name substitution - use replace() not format()
         # SQL files may contain { } characters
-        sql_content = sql_content.replace('osm.', f'{schema_name}.')
+        sql_content = sql_content.replace("osm.", f"{schema_name}.")
 
         with get_db_conn(conn_string=conn_string) as conn:
             cur = conn.cursor()
             cur.execute(sql_content)
 
-        LOGGER.debug(f'Successfully processed {layer_name}')
+        LOGGER.debug(f"Successfully processed {layer_name}")
         return True
 
     except FileNotFoundError:
-        LOGGER.error(f'SQL file not found: {sql_file_path}')
+        LOGGER.error(f"SQL file not found: {sql_file_path}")
         return False
     except psycopg.Error as e:
-        LOGGER.error(f'Database error processing {layer_name}: {e}')
+        LOGGER.error(f"Database error processing {layer_name}: {e}")
         return False
     except Exception as e:
-        LOGGER.error(f'Error processing {layer_name}: {e}')
+        LOGGER.error(f"Error processing {layer_name}: {e}")
         return False
 
 
-def pgosm_after_import(flex_path: str, schema_name: str, skip_nested: bool,
-                       layerset_config: dict, conn_string: str) -> bool:
+def pgosm_after_import(
+    flex_path: str,
+    schema_name: str,
+    skip_nested: bool,
+    layerset_config: dict,
+    conn_string: str,
+) -> bool:
     """Runs post-processing SQL for enabled layers.
 
     Replaces previous Lua-based implementation (run-sql.lua) with native Python.
@@ -565,18 +540,33 @@ def pgosm_after_import(flex_path: str, schema_name: str, skip_nested: bool,
     bool
         True if all SQL executed successfully, False if any errors occurred
     """
-    LOGGER.info('Running post-processing...')
-    LOGGER.debug(f'Schema name: {schema_name}')
-    LOGGER.debug(f'Skip nested: {skip_nested}')
-    LOGGER.debug(f'Loaded layerset config with {len(layerset_config)} layers')
+    LOGGER.info("Running post-processing...")
+    LOGGER.debug(f"Schema name: {schema_name}")
+    LOGGER.debug(f"Skip nested: {skip_nested}")
+    LOGGER.debug(f"Loaded layerset config with {len(layerset_config)} layers")
 
     # Define layers to process (matches Lua's layer list)
     # Must match order and naming from run-sql.lua:39-43
     layers = [
-        'amenity', 'building', 'building_combined_point', 'indoor',
-        'infrastructure', 'landuse', 'leisure', 'natural', 'place',
-        'poi', 'public_transport', 'road', 'road_major', 'shop',
-        'shop_combined_point', 'tags', 'traffic', 'unitable', 'water'
+        "amenity",
+        "building",
+        "building_combined_point",
+        "indoor",
+        "infrastructure",
+        "landuse",
+        "leisure",
+        "natural",
+        "place",
+        "poi",
+        "public_transport",
+        "road",
+        "road_major",
+        "shop",
+        "shop_combined_point",
+        "tags",
+        "traffic",
+        "unitable",
+        "water",
     ]
 
     error_count = 0
@@ -584,28 +574,29 @@ def pgosm_after_import(flex_path: str, schema_name: str, skip_nested: bool,
     # Handle place_polygon_nested (runs when NOT skip_nested)
     # Note: Lua code had logic bug (checked truthy string), we fix it here
     if not skip_nested:
-        LOGGER.info('Processing place_polygon_nested')
-        if not run_post_processing_sql(flex_path, 'place_polygon_nested',
-                                      schema_name, conn_string):
+        LOGGER.info("Processing place_polygon_nested")
+        if not run_post_processing_sql(
+            flex_path, "place_polygon_nested", schema_name, conn_string
+        ):
             error_count += 1
     else:
-        LOGGER.info('Skipping place_polygon_nested (skip_nested=True)')
+        LOGGER.info("Skipping place_polygon_nested (skip_nested=True)")
 
     # Process each enabled layer
     for layer in layers:
         # Check if layer is enabled in layerset config
         # INI values come as strings 'true' or 'false'
-        if layer in layerset_config and layerset_config[layer].lower() == 'true':
+        if layer in layerset_config and layerset_config[layer].lower() == "true":
             if not run_post_processing_sql(flex_path, layer, schema_name, conn_string):
                 error_count += 1
         else:
-            LOGGER.debug(f'Skipping layer: {layer} (not enabled in layerset)')
+            LOGGER.debug(f"Skipping layer: {layer} (not enabled in layerset)")
 
     if error_count > 0:
-        LOGGER.error(f'Post-processing completed with {error_count} error(s)')
+        LOGGER.error(f"Post-processing completed with {error_count} error(s)")
         return False
 
-    LOGGER.info('Post-processing completed successfully')
+    LOGGER.info("Post-processing completed successfully")
     return True
 
 
@@ -617,45 +608,52 @@ def pgosm_nested_admin_polygons(flex_path: str, schema_name: str):
     flex_path : str
     schema_name : str
     """
-    # Populate the table
-    sql_raw_1 = f'CALL {schema_name}.populate_place_polygon_nested();'
+    config = get_config()
 
-    conn_string = os.environ['PGOSM_CONN']
-    cmds = ['psql', '-d', conn_string, '-c', sql_raw_1]
-    LOGGER.info('Populating place_polygon_nested table (osm.populate_place_polygon_nested() )')
-    output = subprocess.run(cmds,
-                            text=True,
-                            cwd=flex_path,
-                            check=False,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT)
-    LOGGER.info(f'Nested polygon output: \n {output.stdout}')
+    # Populate the table
+    sql_raw_1 = f"CALL {schema_name}.populate_place_polygon_nested();"
+
+    conn_string = config.database_connection_string()
+    cmds = ["psql", "-d", conn_string, "-c", sql_raw_1]
+    LOGGER.info(
+        "Populating place_polygon_nested table (osm.populate_place_polygon_nested() )"
+    )
+    output = subprocess.run(
+        cmds,
+        text=True,
+        cwd=flex_path,
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    LOGGER.info(f"Nested polygon output: \n {output.stdout}")
 
     if output.returncode != 0:
-        err_msg = f'Failed to populate nested polygon data. Return code: {output.returncode}'
+        err_msg = (
+            f"Failed to populate nested polygon data. Return code: {output.returncode}"
+        )
         LOGGER.error(err_msg)
-        sys.exit(f'{err_msg} - Check the log output for details.')
-
+        sys.exit(f"{err_msg} - Check the log output for details.")
 
     # Build the data
-    sql_raw_2 = f' CALL {schema_name}.build_nested_admin_polygons();'
+    sql_raw_2 = f" CALL {schema_name}.build_nested_admin_polygons();"
 
-    conn_string = os.environ['PGOSM_CONN']
-    cmds = ['psql', '-d', conn_string, '-c', sql_raw_2]
-    LOGGER.info('Building nested polygons... (this can take a while)')
-    output = subprocess.run(cmds,
-                            text=True,
-                            cwd=flex_path,
-                            check=False,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT)
-    LOGGER.info(f'Nested polygon output: \n {output.stdout}')
+    cmds = ["psql", "-d", conn_string, "-c", sql_raw_2]
+    LOGGER.info("Building nested polygons... (this can take a while)")
+    output = subprocess.run(
+        cmds,
+        text=True,
+        cwd=flex_path,
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    LOGGER.info(f"Nested polygon output: \n {output.stdout}")
 
     if output.returncode != 0:
-        err_msg = f'Failed to build nested polygons. Return code: {output.returncode}'
+        err_msg = f"Failed to build nested polygons. Return code: {output.returncode}"
         LOGGER.error(err_msg)
-        sys.exit(f'{err_msg} - Check the log output for details.')
-
+        sys.exit(f"{err_msg} - Check the log output for details.")
 
 
 def osm2pgsql_replication_start():
@@ -664,10 +662,11 @@ def osm2pgsql_replication_start():
     This function is necessary for using `--replication (osm2pgsql-replication)
     and `--update append` mode.
     """
-    LOGGER.info('Prep database to allow data updates.')
-    sql_raw = 'CALL osm.append_data_start();'
+    config = get_config()
+    LOGGER.info("Prep database to allow data updates.")
+    sql_raw = "CALL osm.append_data_start();"
 
-    with get_db_conn(conn_string=connection_string()) as conn:
+    with get_db_conn(conn_string=config.database.connection_string()) as conn:
         cur = conn.cursor()
         cur.execute(sql_raw)
 
@@ -682,28 +681,28 @@ def osm2pgsql_replication_finish(skip_nested: bool):
     ---------------------
     skip_nested : bool
     """
+    config = get_config()
+
     # Fails via psycopg, using psql
     if skip_nested:
-        LOGGER.info('Finishing Replication, skipping nested polygons')
-        sql_raw = 'CALL osm.append_data_finish(skip_nested := True );'
+        LOGGER.info("Finishing Replication, skipping nested polygons")
+        sql_raw = "CALL osm.append_data_finish(skip_nested := True );"
     else:
-        LOGGER.info('Finishing Replication, including nested polygons')
-        sql_raw = 'CALL osm.append_data_finish(skip_nested := False );'
+        LOGGER.info("Finishing Replication, including nested polygons")
+        sql_raw = "CALL osm.append_data_finish(skip_nested := False );"
 
-    conn_string = os.environ['PGOSM_CONN']
-    cmds = ['psql', '-d', conn_string, '-c', sql_raw]
-    LOGGER.info('Finishing Replication')
-    output = subprocess.run(cmds,
-                            text=True,
-                            check=False,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT)
-    LOGGER.info(f'Finishing replication output: \n {output.stdout}')
+    conn_string = config.database_connection_string()
+    cmds = ["psql", "-d", conn_string, "-c", sql_raw]
+    LOGGER.info("Finishing Replication")
+    output = subprocess.run(
+        cmds, text=True, check=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+    )
+    LOGGER.info(f"Finishing replication output: \n {output.stdout}")
 
     if output.returncode != 0:
-        err_msg = f'Failed to finish replication. Return code: {output.returncode}'
+        err_msg = f"Failed to finish replication. Return code: {output.returncode}"
         LOGGER.error(err_msg)
-        sys.exit(f'{err_msg} - Check the log output for details.')
+        sys.exit(f"{err_msg} - Check the log output for details.")
 
 
 def run_pg_dump(export_path, skip_qgis_style):
@@ -715,29 +714,37 @@ def run_pg_dump(export_path, skip_qgis_style):
         Absolute path to output .sql file
     skip_qgis_style : bool
     """
-    logger = logging.getLogger('pgosm-flex')
-    conn_string = os.environ['PGOSM_CONN']
-    schema_name = 'osm'
+    config = get_config()
+    logger = logging.getLogger("pgosm-flex")
+    conn_string = config.database_connection_string()
+    schema_name = "osm"
 
     if skip_qgis_style:
-        logger.info(f'Running pg_dump (only {schema_name} schema)')
-        cmds = ['pg_dump', '-d', conn_string,
-                f'--schema={schema_name}',
-                '-f', export_path]
+        logger.info(f"Running pg_dump (only {schema_name} schema)")
+        cmds = [
+            "pg_dump",
+            "-d",
+            conn_string,
+            f"--schema={schema_name}",
+            "-f",
+            export_path,
+        ]
     else:
-        logger.info(f'Running pg_dump ({schema_name} schema plus extras)')
-        cmds = ['pg_dump', '-d', conn_string,
-                f'--schema={schema_name}',
-                '--schema=pgosm',
-                '--schema=public',
-                '-f', export_path]
+        logger.info(f"Running pg_dump ({schema_name} schema plus extras)")
+        cmds = [
+            "pg_dump",
+            "-d",
+            conn_string,
+            f"--schema={schema_name}",
+            "--schema=pgosm",
+            "--schema=public",
+            "-f",
+            export_path,
+        ]
 
-    output = subprocess.run(cmds,
-                            text=True,
-                            capture_output=True,
-                            check=False)
-    LOGGER.info(f'pg_dump complete, saved to {export_path}')
-    LOGGER.debug(f'pg_dump output: \n {output.stderr}')
+    output = subprocess.run(cmds, text=True, capture_output=True, check=False)
+    LOGGER.info(f"pg_dump complete, saved to {export_path}")
+    LOGGER.debug(f"pg_dump output: \n {output.stderr}")
     fix_pg_dump_create_public(export_path)
 
 
@@ -750,11 +757,21 @@ def fix_pg_dump_create_public(export_path: str):
     ----------------------
     export_path : str
     """
-    result = sh.sed('-i',
-           's/CREATE SCHEMA public;/CREATE SCHEMA IF NOT EXISTS public;/',
-           export_path)
-    LOGGER.debug('Completed replacement to not fail when public schema exists')
-    LOGGER.debug(result)
+    # Read the file content
+    with open(export_path, 'r') as f:
+        content = f.read()
+
+    # Replace the problematic CREATE SCHEMA statement
+    content = content.replace(
+        'CREATE SCHEMA public;',
+        'CREATE SCHEMA IF NOT EXISTS public;'
+    )
+
+    # Write back to the same file
+    with open(export_path, 'w') as f:
+        f.write(content)
+
+    LOGGER.debug("Completed replacement to not fail when public schema exists")
 
 
 def log_import_message(import_id: int, msg: str, schema_name: str):
@@ -769,9 +786,9 @@ def log_import_message(import_id: int, msg: str, schema_name: str):
     schema_name: str
     """
     try:
-        pbf_timestamp = os.environ['PBF_TIMESTAMP']
+        pbf_timestamp = os.environ["PBF_TIMESTAMP"]
     except KeyError:
-        pbf_timestamp = os.environ['PGOSM_DATE']
+        pbf_timestamp = os.environ["PGOSM_DATE"]
 
     sql_raw = """
 UPDATE {schema_name}.pgosm_flex
@@ -781,10 +798,8 @@ UPDATE {schema_name}.pgosm_flex
 ;
 """
     sql_raw = sql_raw.format(schema_name=schema_name)
-    with get_db_conn(conn_string=os.environ['PGOSM_CONN']) as conn:
-        params = {'import_id': import_id,
-                  'msg': msg,
-                  'pbf_timestamp': pbf_timestamp}
+    with get_db_conn(conn_string=os.environ["PGOSM_CONN"]) as conn:
+        params = {"import_id": import_id, "msg": msg, "pbf_timestamp": pbf_timestamp}
         cur = conn.cursor()
         cur.execute(sql_raw, params=params)
 
@@ -800,25 +815,23 @@ def get_prior_import(schema_name: str) -> dict:
     --------------------
     results : dict
     """
+    config = get_config()
     sql_raw = """
-SELECT id, osm_date, region, layerset, import_status,
-        import_mode ->> 'replication' AS replication,
-        import_mode ->> 'update' AS use_update,
-        import_mode,
-        split_part(pgosm_flex_version, '-', 1) AS pgosm_flex_version_no_hash
-    FROM {schema_name}.pgosm_flex
-    ORDER BY imported DESC
-    LIMIT 1
-;
-"""
+        SELECT id, osm_date, region, layerset, import_status,
+                import_mode ->> 'replication' AS replication,
+                import_mode ->> 'update' AS use_update,
+                import_mode,
+                split_part(pgosm_flex_version, '-', 1) AS pgosm_flex_version_no_hash
+            FROM {schema_name}.pgosm_flex
+            ORDER BY imported DESC
+            LIMIT 1
+    """
     sql_raw = sql_raw.format(schema_name=schema_name)
-    with get_db_conn(conn_string=os.environ['PGOSM_CONN']) as conn:
+    with get_db_conn(conn_string=config.database.connection_string()) as conn:
         cur = conn.cursor(row_factory=psycopg.rows.dict_row)
         results = cur.execute(sql_raw).fetchone()
 
-    if isinstance(results, type(None)):
+    if results is None:
         results = {}
 
     return results
-
-    

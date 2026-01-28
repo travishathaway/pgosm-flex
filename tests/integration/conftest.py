@@ -1,4 +1,5 @@
 """Shared fixtures for integration tests."""
+
 import os
 import pytest
 import psycopg
@@ -12,17 +13,17 @@ def db_connection_string():
     Returns connection string for pgosm database.
     Falls back to defaults if environment variables not set.
     """
-    user = os.environ.get('POSTGRES_USER', 'postgres')
-    password = os.environ.get('POSTGRES_PASSWORD')
-    host = os.environ.get('POSTGRES_HOST', 'localhost')
-    database = 'pgosm'
+    user = os.environ.get("POSTGRES_USER", "postgres")
+    password = os.environ.get("POSTGRES_PASSWORD")
+    host = os.environ.get("POSTGRES_HOST", "localhost")
+    database = "pgosm"
 
-    app_str = '?application_name=pgosm-flex-tests'
+    app_str = "?application_name=pgosm-flex-tests"
 
     if password:
-        conn_str = f'postgresql://{user}:{password}@{host}/{database}{app_str}'
+        conn_str = f"postgresql://{user}:{password}@{host}/{database}{app_str}"
     else:
-        conn_str = f'postgresql://{user}@{host}/{database}{app_str}'
+        conn_str = f"postgresql://{user}@{host}/{database}{app_str}"
 
     return conn_str
 
@@ -42,19 +43,19 @@ def db_connection(db_connection_string):
 @pytest.fixture(scope="session")
 def test_data_dir():
     """Return path to test data directory."""
-    return Path(__file__).parent.parent / 'data'
+    return Path(__file__).parent.parent / "data"
 
 
 @pytest.fixture(scope="session")
 def sql_dir():
     """Return path to SQL test files."""
-    return Path(__file__).parent.parent / 'sql'
+    return Path(__file__).parent.parent / "sql"
 
 
 @pytest.fixture(scope="session")
 def expected_dir():
     """Return path to expected output files."""
-    return Path(__file__).parent.parent / 'expected'
+    return Path(__file__).parent.parent / "expected"
 
 
 def execute_sql_file(conn, sql_file_path):
@@ -72,7 +73,7 @@ def execute_sql_file(conn, sql_file_path):
     str
         Query results in pipe-delimited format (matching psql -tA output)
     """
-    with open(sql_file_path, 'r') as f:
+    with open(sql_file_path, "r") as f:
         sql = f.read()
 
     with conn.cursor() as cur:
@@ -87,10 +88,10 @@ def execute_sql_file(conn, sql_file_path):
         lines = []
         for row in rows:
             # Convert values to strings and join with pipe
-            line = '|'.join(str(val) if val is not None else '' for val in row)
+            line = "|".join(str(val) if val is not None else "" for val in row)
             lines.append(line)
 
-        return '\n'.join(lines)
+        return "\n".join(lines)
 
 
 def read_expected_output(expected_file_path):
@@ -109,7 +110,7 @@ def read_expected_output(expected_file_path):
     if not expected_file_path.exists():
         return ""
 
-    with open(expected_file_path, 'r') as f:
+    with open(expected_file_path, "r") as f:
         content = f.read()
 
     # Strip trailing whitespace and newline to match actual output

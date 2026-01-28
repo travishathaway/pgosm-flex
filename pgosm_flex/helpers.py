@@ -1,5 +1,5 @@
-"""Generic functions and attributes used in multiple modules of PgOSM Flex.
-"""
+"""Generic functions and attributes used in multiple modules of PgOSM Flex."""
+
 import datetime
 import logging
 import subprocess
@@ -7,7 +7,7 @@ import os
 import sys
 from time import sleep
 
-DEFAULT_SRID = '3857'
+DEFAULT_SRID = "3857"
 
 
 def get_today() -> str:
@@ -17,15 +17,13 @@ def get_today() -> str:
     -------------------------
     today : str
     """
-    today = datetime.datetime.today().strftime('%Y-%m-%d')
+    today = datetime.datetime.today().strftime("%Y-%m-%d")
     return today
 
 
-def run_command_via_subprocess(cmd: list,
-                               cwd: str,
-                               output_lines: list = None,
-                               print_to_log: bool = False
-                               ) -> int:
+def run_command_via_subprocess(
+    cmd: list, cwd: str, output_lines: list = None, print_to_log: bool = False
+) -> int:
     """Wraps around subprocess.Popen() to run commands outside of Python. Prints
     output as it goes, returns the status code from the command.
 
@@ -46,17 +44,17 @@ def run_command_via_subprocess(cmd: list,
         Return code from command
     """
     output_lines = output_lines or []
-    logger = logging.getLogger('pgosm-flex')
-    with subprocess.Popen(cmd, cwd=cwd, stdout=subprocess.PIPE,
-                          stderr=subprocess.STDOUT
-                          ) as process:
+    logger = logging.getLogger("pgosm-flex")
+    with subprocess.Popen(
+        cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+    ) as process:
         while True:
             output = process.stdout.readline()
-            if process.poll() is not None and output == b'':
+            if process.poll() is not None and output == b"":
                 break
 
             if output:
-                ln = output.strip().decode('utf-8')
+                ln = output.strip().decode("utf-8")
                 output_lines.append(ln)
                 if print_to_log:
                     logger.info(ln)
@@ -81,27 +79,29 @@ def verify_checksum(md5_file: str, path: str):
     path : str
         Path to directory with `md5_file` to validate
     """
-    logger = logging.getLogger('pgosm-flex')
-    logger.debug(f'Validating {md5_file} in {path}')
+    logger = logging.getLogger("pgosm-flex")
+    logger.debug(f"Validating {md5_file} in {path}")
 
     import hashlib
 
     md5 = hashlib.md5()
 
-    with open(md5_file.replace('.md5', ''), 'rb') as f: 
+    with open(md5_file.replace(".md5", ""), "rb") as f:
         while chunk := f.read(8192):
             md5.update(chunk)
         actual_md5 = md5.hexdigest()
 
-    with open(md5_file, 'r') as f:
+    with open(md5_file, "r") as f:
         expected_md5 = f.read().strip().split()[0]
 
     if actual_md5 != expected_md5:
-        err_msg = f'Failed to validate md5sum. Expected: {expected_md5}, Actual: {actual_md5}'
+        err_msg = (
+            f"Failed to validate md5sum. Expected: {expected_md5}, Actual: {actual_md5}"
+        )
         logger.error(err_msg)
         sys.exit(err_msg)
 
-    logger.debug('md5sum validated')
+    logger.debug("md5sum validated")
 
 
 def get_region_combined(region: str, subregion: str) -> str:
@@ -117,9 +117,9 @@ def get_region_combined(region: str, subregion: str) -> str:
     pgosm_region : str
     """
     if subregion is None:
-        pgosm_region = f'{region}'
+        pgosm_region = f"{region}"
     else:
-        os.environ['PGOSM_SUBREGION'] = subregion
-        pgosm_region = f'{region}-{subregion}'
+        os.environ["PGOSM_SUBREGION"] = subregion
+        pgosm_region = f"{region}-{subregion}"
 
     return pgosm_region
