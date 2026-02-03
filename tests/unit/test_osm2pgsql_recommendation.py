@@ -1,6 +1,5 @@
 """Unit tests to cover the osm2pgsql_recommendation module."""
 
-import os
 import unittest
 
 from pgosm_flex import osm2pgsql_recommendation
@@ -35,7 +34,7 @@ class Osm2pgsqlRecommendationTests(unittest.TestCase):
         self.assertEqual(expected, actual)
 
     def test_get_recommended_script_returns_expected_value_simple_example(self):
-        expected = "osm2pgsql -d postgresql://postgres:mysecretpassword@localhost:5432/pgosm?application_name=pgosm-flex  --cache=0  --slim  --drop  --flat-nodes=/tmp/nodes  --create  --output=flex --style=./run.lua  This-is-a-test.osm.pbf"
+        expected = "osm2pgsql -d postgresql://postgres@localhost:5432/pgosm?application_name=pgosm-flex  --cache=0  --slim  --drop  --flat-nodes=/tmp/nodes  --create  --output=flex --style=./run.lua  This-is-a-test.osm.pbf"
         system_ram_gb = 2
         osm_pbf_gb = 10
         im = ImportConfig(
@@ -53,7 +52,7 @@ class Osm2pgsqlRecommendationTests(unittest.TestCase):
         self.assertEqual(expected, actual)
 
     def test_get_recommended_script_returns_expected_value_update_create(self):
-        expected = "osm2pgsql -d postgresql://postgres:mysecretpassword@localhost:5432/pgosm?application_name=pgosm-flex  --cache=0  --slim  --flat-nodes=/tmp/nodes  --create  --output=flex --style=./run.lua  This-is-a-test.osm.pbf"
+        expected = "osm2pgsql -d postgresql://postgres@localhost:5432/pgosm?application_name=pgosm-flex  --cache=0  --slim  --flat-nodes=/tmp/nodes  --create  --output=flex --style=./run.lua  This-is-a-test.osm.pbf"
         system_ram_gb = 2
         osm_pbf_gb = 10
         im = ImportConfig(
@@ -71,7 +70,7 @@ class Osm2pgsqlRecommendationTests(unittest.TestCase):
         self.assertEqual(expected, actual)
 
     def test_get_recommended_script_returns_expected_value_update_append(self):
-        expected = "osm2pgsql -d postgresql://postgres:mysecretpassword@localhost:5432/pgosm?application_name=pgosm-flex  --cache=0  --slim  --flat-nodes=/tmp/nodes  --append  --output=flex --style=./run.lua  This-is-a-test.osm.pbf"
+        expected = "osm2pgsql -d postgresql://postgres@localhost:5432/pgosm?application_name=pgosm-flex  --cache=0  --slim  --flat-nodes=/tmp/nodes  --append  --output=flex --style=./run.lua  This-is-a-test.osm.pbf"
         system_ram_gb = 2
         osm_pbf_gb = 10
         im = ImportConfig(
@@ -94,7 +93,7 @@ class Osm2pgsqlRecommendationTests(unittest.TestCase):
         osm2pgsql-tuner is not involved at those steps so no recommended script
         is generated.
         """
-        expected = "osm2pgsql -d postgresql://postgres:mysecretpassword@localhost:5432/pgosm?application_name=pgosm-flex  --cache=0  --slim  --flat-nodes=/tmp/nodes  --create  --output=flex --style=./run.lua  This-is-a-test.osm.pbf"
+        expected = "osm2pgsql -d postgresql://postgres@localhost:5432/pgosm?application_name=pgosm-flex  --cache=0  --slim  --flat-nodes=/tmp/nodes  --create  --output=flex --style=./run.lua  This-is-a-test.osm.pbf"
         system_ram_gb = 2
         osm_pbf_gb = 10
         im = ImportConfig(

@@ -6,6 +6,7 @@ import logging
 import os
 
 from . import db, helpers, osm2pgsql_tuner as tuner
+from .config import get_config
 
 LOGGER = logging.getLogger("pgosm-flex")
 
@@ -76,6 +77,7 @@ def get_recommended_script(
         connections.
     """
     LOGGER.debug("Generating recommended osm2pgsql command")
+    config = get_config()
 
     rec = tuner.Recommendation(
         system_ram_gb=system_ram_gb,
@@ -92,7 +94,7 @@ def get_recommended_script(
     LOGGER.debug(f"Generic command to run: {osm2pgsql_cmd}")
 
     # Replace generic connection string with specific conn string
-    conn_string = db.connection_string()
+    conn_string = config.database.connection_string()
     osm2pgsql_cmd = osm2pgsql_cmd.replace("-d $PGOSM_CONN", f"-d {conn_string}")
     # Warning: Do not print() this string any more! Includes password
     return osm2pgsql_cmd
