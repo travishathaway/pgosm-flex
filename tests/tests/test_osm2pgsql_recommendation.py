@@ -4,7 +4,7 @@ import os
 import unittest
 
 from pgosm_flex import osm2pgsql_recommendation
-from pgosm_flex.helpers import ImportMode
+from pgosm_flex.config import ImportConfig
 
 
 class Osm2pgsqlRecommendationTests(unittest.TestCase):
@@ -18,7 +18,7 @@ class Osm2pgsqlRecommendationTests(unittest.TestCase):
         expected = str
         system_ram_gb = 2
         osm_pbf_gb = 10
-        im = ImportMode(
+        im = ImportConfig(
             replication=False, replication_update=False, update=None, force=False
         )
         pbf_filename = "This-is-a-test.osm.pbf"
@@ -38,7 +38,7 @@ class Osm2pgsqlRecommendationTests(unittest.TestCase):
         expected = "osm2pgsql -d postgresql://postgres:mysecretpassword@localhost:5432/pgosm?application_name=pgosm-flex  --cache=0  --slim  --drop  --flat-nodes=/tmp/nodes  --create  --output=flex --style=./run.lua  This-is-a-test.osm.pbf"
         system_ram_gb = 2
         osm_pbf_gb = 10
-        im = ImportMode(
+        im = ImportConfig(
             replication=False, replication_update=False, update=None, force=False
         )
         pbf_filename = "This-is-a-test.osm.pbf"
@@ -56,7 +56,7 @@ class Osm2pgsqlRecommendationTests(unittest.TestCase):
         expected = "osm2pgsql -d postgresql://postgres:mysecretpassword@localhost:5432/pgosm?application_name=pgosm-flex  --cache=0  --slim  --flat-nodes=/tmp/nodes  --create  --output=flex --style=./run.lua  This-is-a-test.osm.pbf"
         system_ram_gb = 2
         osm_pbf_gb = 10
-        im = ImportMode(
+        im = ImportConfig(
             replication=False, replication_update=False, update="create", force=False
         )
         pbf_filename = "This-is-a-test.osm.pbf"
@@ -74,7 +74,7 @@ class Osm2pgsqlRecommendationTests(unittest.TestCase):
         expected = "osm2pgsql -d postgresql://postgres:mysecretpassword@localhost:5432/pgosm?application_name=pgosm-flex  --cache=0  --slim  --flat-nodes=/tmp/nodes  --append  --output=flex --style=./run.lua  This-is-a-test.osm.pbf"
         system_ram_gb = 2
         osm_pbf_gb = 10
-        im = ImportMode(
+        im = ImportConfig(
             replication=False, replication_update=False, update="append", force=False
         )
         pbf_filename = "This-is-a-test.osm.pbf"
@@ -97,7 +97,7 @@ class Osm2pgsqlRecommendationTests(unittest.TestCase):
         expected = "osm2pgsql -d postgresql://postgres:mysecretpassword@localhost:5432/pgosm?application_name=pgosm-flex  --cache=0  --slim  --flat-nodes=/tmp/nodes  --create  --output=flex --style=./run.lua  This-is-a-test.osm.pbf"
         system_ram_gb = 2
         osm_pbf_gb = 10
-        im = ImportMode(
+        im = ImportConfig(
             replication=True, replication_update=False, update=None, force=False
         )
         pbf_filename = "This-is-a-test.osm.pbf"

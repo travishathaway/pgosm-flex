@@ -1,14 +1,14 @@
 """This module handles the auto-file handling using Geofabrik's download service."""
 
 import logging
-import httpx
 import json
 import os
 import shutil
 
-import requests
+import httpx
 
 from . import helpers
+from .config import get_config
 
 
 def get_region_filename() -> str:
@@ -19,8 +19,9 @@ def get_region_filename() -> str:
     ----------------------
     filename : str
     """
-    region = os.environ.get("PGOSM_REGION")
-    subregion = os.environ.get("PGOSM_SUBREGION")
+    config = get_config()
+    region = config.region.region
+    subregion = config.region.subregion
 
     base_name = "{}-latest.osm.pbf"
     if subregion is None:
@@ -47,9 +48,10 @@ def prepare_data(out_path: str, skip_verify_checksum: bool = False) -> str:
     pbf_file : str
         Full path to PBF file
     """
-    region = os.environ.get("PGOSM_REGION")
-    subregion = os.environ.get("PGOSM_SUBREGION")
-    pgosm_date = os.environ.get("PGOSM_DATE")
+    config = get_config()
+    region = config.region.region
+    subregion = config.region.subregion
+    pgosm_date = config.region.pgosm_date
 
     pbf_filename = get_region_filename()
 

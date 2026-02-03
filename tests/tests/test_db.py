@@ -1,8 +1,6 @@
 """Unit tests to cover the DB module."""
 
-import os
 from urllib import parse
-from unittest import mock
 
 import pytest
 from pydantic.types import SecretStr
