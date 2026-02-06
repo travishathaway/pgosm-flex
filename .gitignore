@@ -11,3 +11,6 @@ docs/book/*
 # pixi environments
 .pixi/*
 !.pixi/config.toml
+
+# Local PostgreSQL data directory (pixi development)
+.pgdata/

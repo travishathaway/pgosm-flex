@@ -290,6 +290,10 @@ def drop_pgosm_db():
     Returns
     ------------------------
     status : bool
+
+    TODO:
+        Don't drop the database. Let's instead drop all the tables in the specified
+        schema instead.
     """
     config = get_config()
 

@@ -12,7 +12,6 @@ pgosm_tests database.
 Run with: pytest -m integration tests/integration/test_extra_loads.py
 """
 
-import os
 import pytest
 import psycopg
 import subprocess
@@ -27,49 +26,6 @@ def get_extra_region_files(test_data_dir):
     return sorted(extra_dir.glob("*.osm.pbf"))
 
 
-@pytest.fixture(scope="function")
-def test_database():
-    """Create and manage pgosm_tests database for testing.
-
-    This fixture drops and recreates the database for each test.
-    """
-    # Connection parameters
-    user = os.environ.get("POSTGRES_USER", "postgres")
-    password = os.environ.get("POSTGRES_PASSWORD")
-    host = os.environ.get("POSTGRES_HOST", "localhost")
-
-    # Admin connection (to postgres database)
-    if password:
-        admin_conn_str = f"postgresql://{user}:{password}@{host}/postgres"
-    else:
-        admin_conn_str = f"postgresql://{user}@{host}/postgres"
-
-    # Drop test database if exists
-    admin_conn = psycopg.connect(admin_conn_str, autocommit=True)
-    try:
-        with admin_conn.cursor() as cur:
-            cur.execute("DROP DATABASE IF EXISTS pgosm_tests;")
-            cur.execute("CREATE DATABASE pgosm_tests;")
-    finally:
-        admin_conn.close()
-
-    # Connect to test database and create schema
-    if password:
-        test_conn_str = f"postgresql://{user}:{password}@{host}/pgosm_tests"
-    else:
-        test_conn_str = f"postgresql://{user}@{host}/pgosm_tests"
-
-    test_conn = psycopg.connect(test_conn_str)
-    try:
-        with test_conn.cursor() as cur:
-            cur.execute("CREATE EXTENSION IF NOT EXISTS postgis;")
-            cur.execute("CREATE SCHEMA IF NOT EXISTS osm;")
-        test_conn.commit()
-
-        yield test_conn_str
-
-    finally:
-        test_conn.close()
 
 
 @pytest.mark.integration
@@ -181,13 +137,13 @@ def test_all_extra_regions_load(test_database, test_data_dir):
             "-d",
             "pgosm_tests",
             "--output=flex",
-            "--style=run-all.lua",
             str(pbf_file.absolute()),
         ]
 
         result = subprocess.run(
             cmd, cwd=str(flex_config_dir), capture_output=True, text=True, timeout=300
         )
+        assert result.stderr == ""
 
         if result.returncode == 0:
             loaded_count += 1

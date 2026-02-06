@@ -26,7 +26,7 @@ from .config import init_config, get_config
 # Required and most common options first
 @click.option(
     "--ram",
-    required=True,
+    required=False,
     type=float,
     help="Amount of RAM in GB available on the machine running the Docker container. This is used to determine the "
          "appropriate osm2pgsql command via osm2pgsql-tuner recommendation engine.",
@@ -59,7 +59,7 @@ from .config import init_config, get_config
 )
 @click.option(
     "--layerset",
-    required=True,
+    required=False,
     default="default",
     help="Layerset to load. Defines name of included layerset unless --layerset-path is defined.",
 )
@@ -154,7 +154,7 @@ def run_pgosm_flex(
     base_path,
     skip_verify_checksum,
 ):
-    """Run PgOSM Flex within Docker to automate osm2pgsql flex processing."""
+    """Run PgOSM Flex to automate osm2pgsql flex processing."""
     # Collect CLI args into dict
     cli_args = {
         "ram": ram,
@@ -227,19 +227,11 @@ def run_pgosm_flex(
 
     logger.debug(f"UPDATE setting:  {config.import_mode.update}")
 
-    # Create legacy ImportMode object for backward compatibility
-    import_mode = helpers.ImportMode(
-        replication=config.import_mode.replication,
-        replication_update=replication_update,
-        update=config.import_mode.update,
-        force=config.import_mode.force,
-    )
-
     db.prepare_pgosm_db(db_path=paths["db_path"])
 
     prior_import = db.get_prior_import(schema_name=config.processing.schema_name)
 
-    if not import_mode.okay_to_run(prior_import):
+    if not config.import_mode.okay_to_run(prior_import):
         msg = "Not okay to run PgOSM Flex. Exiting"
         logger.error(msg)
         sys.exit(msg)
@@ -253,21 +245,13 @@ def run_pgosm_flex(
     )
 
     import_id = db.start_import(
-        pgosm_region=config.region.region_combined,
-        pgosm_date=config.region.pgosm_date,
-        srid=config.processing.srid,
-        language=config.processing.language,
-        layerset=config.layerset.layerset,
-        version_info=__version__,
         osm2pgsql_version=vers_lines,
-        import_mode=import_mode,
-        schema_name=config.processing.schema_name,
-        input_file=config.region.input_file_str,
+        schema_name=config.processing.schema_name
     )
 
     logger.info(f"Started import id {import_id}")
 
-    if import_mode.replication_update:
+    if config.import_mode.replication_update:
         logger.info("Running osm2pgsql-replication in update mode")
         success = run_replication_update(
             skip_nested=config.import_mode.skip_nested, flex_path=paths["flex_path"]
@@ -280,7 +264,7 @@ def run_pgosm_flex(
             flex_path=paths["flex_path"],
             ram=config.processing.ram,
             skip_nested=config.import_mode.skip_nested,
-            import_mode=import_mode,
+            import_mode=config.import_mode,
             debug=config.processing.debug,
             schema_name=config.processing.schema_name,
             config=config,
@@ -316,10 +300,7 @@ def run_osm2pgsql_standard(
     ram,
     skip_nested,
     import_mode,
-    debug,
-    schema_name,
-    config,
-    skip_verify_checksum=True,
+    debug
 ):
     """Runs standard osm2pgsql command and optionally inits for replication
     (osm2pgsql-replication) mode.
@@ -344,15 +325,19 @@ def run_osm2pgsql_standard(
         Indicates overall success/failure of the steps within this function.
     """
     logger = logging.getLogger("pgosm-flex")
+    config = get_config()
 
-    if input_file is None:
+    if config.region.input_file is None:
         geofabrik.prepare_data(out_path=out_path, skip_verify_checksum=True)
         pbf_filename = geofabrik.get_region_filename()
     else:
-        pbf_filename = input_file
+        pbf_filename = config.region.input_file
 
     osm2pgsql_command = rec.osm2pgsql_recommendation(
-        ram=ram, pbf_filename=pbf_filename, out_path=out_path, import_mode=import_mode
+        ram=config.processing.ram,
+        pbf_filename=pbf_filename,
+        out_path=out_path,
+        import_mode=config.import_mode
     )
 
     run_osm2pgsql(osm2pgsql_command=osm2pgsql_command, flex_path=flex_path, debug=debug)
@@ -362,11 +347,7 @@ def run_osm2pgsql_standard(
         skip_nested = check_layerset_skip_nested_place(flex_path)
 
     post_processing = run_post_processing(
-        flex_path=flex_path,
-        skip_nested=skip_nested,
-        import_mode=import_mode,
-        schema_name=schema_name,
-        config=config,
+        flex_path=flex_path, skip_nested=skip_nested
     )
 
     if import_mode.replication:
@@ -521,17 +502,8 @@ def get_paths(base_path: str | None = None):
     return paths
 
 
-def get_export_filename(input_file):
-    """Returns the .sql filename to use for pg_dump.
-
-    Parameters
-    ----------------------
-    input_file : str
-
-    Returns
-    ----------------------
-    filename : str
-    """
+def get_export_filename(input_file: str | None) -> str:
+    """Returns the .sql filename to use for pg_dump."""
     # always set internally, even with --input-file and no --region
     config = get_config()
     region = config.region.region.replace("/", "-")
@@ -672,7 +644,7 @@ def layerset_include_place(flex_path: str) -> bool:
     return place
 
 
-def run_post_processing(flex_path, skip_nested, import_mode, schema_name):
+def run_post_processing(flex_path, skip_nested: bool) -> bool:
     """Runs steps following osm2pgsql import.
 
     Post-processing SQL scripts and (optionally) calculate nested admin polygons
@@ -681,8 +653,6 @@ def run_post_processing(flex_path, skip_nested, import_mode, schema_name):
     ----------------------
     flex_path : str
     skip_nested : bool
-    import_mode : helpers.helpers.ImportMode
-    schema_name : str
 
     Returns
     ----------------------
@@ -693,11 +663,11 @@ def run_post_processing(flex_path, skip_nested, import_mode, schema_name):
     logger = logging.getLogger("pgosm-flex")
     config = get_config()
 
-    if not import_mode.run_post_sql:
+    if not config.import_mode.run_post_sql:
         msg = "Running with --update append: Skipping post-processing SQL."
         msg += " Running osm2pgsql_replication_finish() instead."
         logger.info(msg)
-        db.osm2pgsql_replication_finish(skip_nested=skip_nested)
+        db.osm2pgsql_replication_finish(skip_nested=config.import_mode.skip_nested)
         return True
 
     # Load layerset configuration
@@ -707,16 +677,16 @@ def run_post_processing(flex_path, skip_nested, import_mode, schema_name):
     post_processing_sql = db.pgosm_after_import(
         flex_path=flex_path,
         schema_name=config.processing.schema_name,
-        skip_nested=config.import_mode.skip_nested,
+        skip_nested=skip_nested,
         layerset_config=layerset_config,
         conn_string=config.database.connection_string(),
     )
 
-    if skip_nested:
+    if config.import_mode.skip_nested:
         logger.info("Skipping calculating nested polygons")
     else:
         logger.info("Calculating nested polygons")
-        db.pgosm_nested_admin_polygons(flex_path, schema_name)
+        db.pgosm_nested_admin_polygons(flex_path, config.processing.schema_name)
 
     if not post_processing_sql:
         return False

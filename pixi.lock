@@ -116,7 +116,7 @@ environments:
       - conda: /Users/travishathaway/opt/conda-local-channel/osx-arm64/postgis-3.6.1-h5defa6b_1.conda
       - conda: /Users/travishathaway/opt/conda-local-channel/osx-arm64/protozero-1.8.1-hdf4cd4f_0.conda
       - pypi: https://files.pythonhosted.org/packages/2a/35/7051599bd493e62411d6ede36fd5af83a38f37c4767b92884df7301db25d/charset_normalizer-3.4.4-cp314-cp314-macosx_10_13_universal2.whl
-      - pypi: https://files.pythonhosted.org/packages/c3/8d/cf134d40c6c3fd6f0e2131d6c8b76c8db94587bea83177fdccced6c2f10f/osmium-4.2.0-cp314-cp314-macosx_11_0_arm64.whl
+      - pypi: https://files.pythonhosted.org/packages/97/90/53f6e04dc10ae30d68ada8c1e48d572a58507b8a6067686b6636ebd75703/osmium-4.3.0-cp314-cp314-macosx_11_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/1e/db/4254e3eabe8020b458f1a747140d32277ec7a271daf1d235b70dc0b4e6e3/requests-2.32.5-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/39/08/aaaad47bc4e9dc8c725e68f9d04865dbcb2052843ff09c97b08904852d84/urllib3-2.6.3-py3-none-any.whl
       - pypi: ./
@@ -244,7 +244,7 @@ environments:
       - conda: /Users/travishathaway/opt/conda-local-channel/osx-arm64/postgis-3.6.1-h5defa6b_1.conda
       - conda: /Users/travishathaway/opt/conda-local-channel/osx-arm64/protozero-1.8.1-hdf4cd4f_0.conda
       - pypi: https://files.pythonhosted.org/packages/2a/35/7051599bd493e62411d6ede36fd5af83a38f37c4767b92884df7301db25d/charset_normalizer-3.4.4-cp314-cp314-macosx_10_13_universal2.whl
-      - pypi: https://files.pythonhosted.org/packages/c3/8d/cf134d40c6c3fd6f0e2131d6c8b76c8db94587bea83177fdccced6c2f10f/osmium-4.2.0-cp314-cp314-macosx_11_0_arm64.whl
+      - pypi: https://files.pythonhosted.org/packages/97/90/53f6e04dc10ae30d68ada8c1e48d572a58507b8a6067686b6636ebd75703/osmium-4.3.0-cp314-cp314-macosx_11_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/1e/db/4254e3eabe8020b458f1a747140d32277ec7a271daf1d235b70dc0b4e6e3/requests-2.32.5-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/39/08/aaaad47bc4e9dc8c725e68f9d04865dbcb2052843ff09c97b08904852d84/urllib3-2.6.3-py3-none-any.whl
       - pypi: ./
@@ -1238,10 +1238,10 @@ packages:
   license: GPL-2.0-only
   size: 789398
   timestamp: 1769307326036
-- pypi: https://files.pythonhosted.org/packages/c3/8d/cf134d40c6c3fd6f0e2131d6c8b76c8db94587bea83177fdccced6c2f10f/osmium-4.2.0-cp314-cp314-macosx_11_0_arm64.whl
+- pypi: https://files.pythonhosted.org/packages/97/90/53f6e04dc10ae30d68ada8c1e48d572a58507b8a6067686b6636ebd75703/osmium-4.3.0-cp314-cp314-macosx_11_0_arm64.whl
   name: osmium
-  version: 4.2.0
-  sha256: ad9367c994a5a5aa1039163dd26333252d2fa17fca184cafa180cb38cd24f80c
+  version: 4.3.0
+  sha256: 6d7e632b31da265e8895c7fc98d7aadb07f8707b476dc1507dbfc46772a0dd9f
   requires_dist:
   - requests
   - pytest ; extra == 'tests'
@@ -1301,7 +1301,7 @@ packages:
 - pypi: ./
   name: pgosm-flex
   version: 0.1.0
-  sha256: 69086cb83f4b5a01880722c891e10babd11ad0c24c84f530ada42dec1f354400
+  sha256: b4a1dcc1943cf1789fdcbd7e27e68b08ac715976d4fc60f7d321aadea7a34f0e
   requires_dist:
   - osmium>=3.4.1
   requires_python: '>=3.13'
