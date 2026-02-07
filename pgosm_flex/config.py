@@ -268,7 +268,7 @@ class ImportConfig(BaseModel):
     def okay_to_run(self, prior_import: dict, current_version: str) -> bool:
         """Determine if it's safe to run without data loss.
 
-        Mirrors logic from ImportMode.okay_to_run() (lines 242-307).
+        Mirrors logic from ImportMode.okay_to_run()
 
         Parameters
         ----------

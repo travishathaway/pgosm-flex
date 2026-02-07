@@ -1,8 +1,8 @@
 require "helpers"
 require "style.shop_helpers"
 
-local index_spec_file = 'indexes/shop_combined_point.ini'
-local indexes_point = get_indexes_from_spec(index_spec_file, 'point')
+local layer_name = 'shop_combined_point'
+local indexes_point = get_indexes_from_spec(layer_name, 'point')
 
 local tables = {}
 

@@ -1,47 +1,39 @@
--- helpers.lua provides commonly used functions 
+-- helpers.lua provides commonly used functions
 -- and sets customizable params, e.g. SRID and schema name.
-local inifile = require('inifile')
 
-local srid_env = os.getenv("PGOSM_SRID")
-if srid_env then
-    srid = srid_env
-    print('Custom SRID: ' .. srid)
+-- Load configuration from environment variable
+local config_code = os.getenv("PGOSM_LUA_CONFIG")
+local config = nil
+
+if config_code then
+    -- Load and execute the code from environment variable
+    local func, err = load(config_code)
+    if func then
+        config = func()
+    else
+        error("Error loading Lua config from PGOSM_LUA_CONFIG: " .. tostring(err))
+    end
 else
-    srid = 3857
-    print('Default SRID: ' .. srid)
+    error("PGOSM_LUA_CONFIG environment variable not set")
 end
 
-
-local pgosm_date_env = os.getenv("PGOSM_DATE")
-if pgosm_date_env then
-    pgosm_date = pgosm_date_env
-    default_date = false
-    print('Explicit Date: ' .. pgosm_date)
-else
-    pgosm_date = os.date("%Y-%m-%d")
-    default_date = true
-    print('Default Date (today): ' .. pgosm_date)
+if not config then
+    error("Failed to load configuration - config is nil")
 end
 
+-- Set global variables from config
+srid = config.srid
+pgosm_date = config.pgosm_date
+pgosm_language = config.pgosm_language
+schema_name = config.schema_name
 
-
-local pgosm_language_env = os.getenv("PGOSM_LANGUAGE")
-if pgosm_language_env then
-    pgosm_language = pgosm_language_env
+-- Print configuration info
+print('SRID: ' .. srid)
+print('Date: ' .. pgosm_date)
+if pgosm_language ~= '' then
     print('INFO - Language Code set to ' .. pgosm_language)
 else
-    pgosm_language = ''
-    print('INFO - Default language not set. Using OSM Wiki priority for name. Set PGOSM_LANGUAGE to customize.')
-end
-
-
-local schema_name_env = os.getenv("SCHEMA_NAME")
-schema_name = nil
-
-if schema_name_env then
-    schema_name = schema_name_env
-else
-    error('Environment variable SCHEMA_NAME must be set.')
+    print('INFO - Default language not set. Using OSM Wiki priority for name.')
 end
 
 
@@ -439,17 +431,36 @@ function get_address(tags)
 end
 
 
-local function should_i_create_index(index_spec_file, geom_type, index_column)
-    -- Checks INI file to determine if index_column should be indexed
-    -- returns bool
-    local index_config = inifile.parse(index_spec_file)
-
-    local create_index = nil
-    if index_config[geom_type][index_column] ~= nil then
-        create_index = index_config[geom_type][index_column]
-    else
-        create_index = index_config['all'][index_column]
+-- Helper to get index config value from generated config
+-- layer_name: e.g., 'poi', 'building'
+-- geom_type: 'point', 'line', 'polygon', or 'all'
+-- key: config key to look up
+local function get_index_config_value(layer_name, geom_type, key)
+    if not config.indexes[layer_name] then
+        return nil
     end
+
+    local layer_config = config.indexes[layer_name]
+
+    -- Try geometry-specific config first
+    if layer_config[geom_type] and layer_config[geom_type][key] ~= nil then
+        return layer_config[geom_type][key]
+    end
+
+    -- Fall back to 'all' section
+    if layer_config.all and layer_config.all[key] ~= nil then
+        return layer_config.all[key]
+    end
+
+    return nil
+end
+
+
+local function should_i_create_index(layer_name, geom_type, index_column)
+    -- Checks config to determine if index_column should be indexed
+    -- returns bool
+    local create_index = get_index_config_value(layer_name, geom_type, index_column)
+
     if create_index == nil then
         create_index = false
     end
@@ -458,20 +469,12 @@ local function should_i_create_index(index_spec_file, geom_type, index_column)
 end
 
 
-local function get_index_method(index_spec_file, geom_type, index_column)
-    local index_config = inifile.parse(index_spec_file)
-
-    -- Attempt to pull index method for column from config file
-    local index_method = nil
+local function get_index_method(layer_name, geom_type, index_column)
+    -- Attempt to pull index method for column from config
     local index_column_def = index_column .. '_method'
+    local index_method = get_index_config_value(layer_name, geom_type, index_column_def)
 
-    if index_config[geom_type][index_column_def] ~= nil then
-        index_method = index_config[geom_type][index_column_def]
-    else
-        index_method = index_config['all'][index_column_def]
-    end
-
-    -- If not set via config file, set basic defaults.
+    -- If not set via config, set basic defaults
     if index_method == nil then
         if index_column == 'geom' then
             index_method = 'gist'
@@ -483,33 +486,22 @@ local function get_index_method(index_spec_file, geom_type, index_column)
     return index_method
 end
 
-local function get_index_where(index_spec_file, geom_type, index_column)
-    -- Return optional WHERE clause to support partial indexes.
+
+local function get_index_where(layer_name, geom_type, index_column)
+    -- Return optional WHERE clause to support partial indexes
     -- nil if not set
-    local index_config = inifile.parse(index_spec_file)
-
-    -- Attempt to pull index method for column from config file
-    local index_where = nil
     local index_column_def = index_column .. '_where'
-
-    if index_config[geom_type][index_column_def] ~= nil then
-        index_where = index_config[geom_type][index_column_def]
-    else
-        index_where = index_config['all'][index_column_def]
-    end
+    local index_where = get_index_config_value(layer_name, geom_type, index_column_def)
 
     return index_where
 end
 
 
-function get_indexes_from_spec(index_spec_file, geom_type)
-    -- Each style can define 1 index_spec_file with multiple sections
-    -- geom_type must be point/line/polygon.
-    -- Sets each index setting first based on geom_type if exists, then
-    -- falls back to file definition if not. If not defined in file sets
-    -- default to false (no indexing)
-    --print('Loading config: ' .. index_spec_file)
-    local index_config = inifile.parse(index_spec_file)
+function get_indexes_from_spec(layer_name, geom_type)
+    -- Gets index configuration for a layer from generated config
+    -- layer_name: layer name (e.g., 'poi', 'building')
+    -- geom_type: must be 'point', 'line', or 'polygon'
+    -- Returns table of index specifications
 
     -------------------------------------------------
     -- Parse through index options. Start with layer specific if exists,
@@ -535,15 +527,12 @@ function get_indexes_from_spec(index_spec_file, geom_type)
     local next_index_id = 1
 
     for k, index_column in pairs(index_columns) do
-        --print(index_column)
-        local create_index = should_i_create_index(index_spec_file, geom_type,
-                                                   index_column)
+        local create_index = should_i_create_index(layer_name, geom_type, index_column)
 
         if create_index then
-            local index_method = get_index_method(index_spec_file, geom_type,
-                                                  index_column)
-            local index_where = get_index_where(index_spec_file, geom_type, index_column)
-            --print('Creating index on ' .. index_column .. ' using ' .. index_method)
+            local index_method = get_index_method(layer_name, geom_type, index_column)
+            local index_where = get_index_where(layer_name, geom_type, index_column)
+
             if index_where ~= nil then
                 indexes[next_index_id] = { column = index_column,
                                             method = index_method,
@@ -555,18 +544,6 @@ function get_indexes_from_spec(index_spec_file, geom_type)
 
             next_index_id = next_index_id + 1
         end
-
-    end
-
-    local index_geom = nil
-    if index_config[geom_type]['index_geom'] ~= nil then
-        index_geom = index_config[geom_type]['index_geom']
-    else
-        index_geom = index_config['all']['index_geom']
-    end
-
-    if index_geom == nil then
-        index_geom = false
     end
 
     return indexes

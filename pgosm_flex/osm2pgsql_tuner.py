@@ -261,7 +261,8 @@ class Recommendation:
 
         cmd += osm2pgsql_mode
 
-        cmd += f" --output=flex --style=./{self.pgosm_layer_set}.lua "
+        cmd += f" --output=flex"
+        cmd += f" --style={self.pgosm_layer_set}"
         cmd += f" {pbf_path}"
 
         return cmd

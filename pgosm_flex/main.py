@@ -7,10 +7,11 @@ import configparser
 import contextlib
 import logging
 import os
+import io
 import sys
 from pathlib import Path
 from importlib import resources
-from tempfile import TemporaryFile
+from tempfile import NamedTemporaryFile
 
 import click
 
@@ -194,11 +195,6 @@ def run_pgosm_flex(
 
     # Use config values throughout
     db.wait_for_postgres()
-    if config.import_mode.force and db.pg_conn_parts()["pg_host"] == "localhost":
-        msg = "Using --force with the built-in database is unnecessary."
-        msg += " The pgosm database is always dropped and recreated when"
-        msg += " running on localhost (in Docker)."
-        logger.warning(msg)
 
     if config.import_mode.replication:
         replication_update = check_replication_exists()
@@ -231,7 +227,7 @@ def run_pgosm_flex(
 
     prior_import = db.get_prior_import(schema_name=config.processing.schema_name)
 
-    if not config.import_mode.okay_to_run(prior_import):
+    if not config.import_mode.okay_to_run(prior_import, __version__):
         msg = "Not okay to run PgOSM Flex. Exiting"
         logger.error(msg)
         sys.exit(msg)
@@ -262,13 +258,9 @@ def run_pgosm_flex(
             input_file=config.region.input_file_str,
             out_path=paths["out_path"],
             flex_path=paths["flex_path"],
-            ram=config.processing.ram,
             skip_nested=config.import_mode.skip_nested,
             import_mode=config.import_mode,
-            debug=config.processing.debug,
-            schema_name=config.processing.schema_name,
-            config=config,
-            skip_verify_checksum=config.region.skip_verify_checksum,
+            debug=config.processing.debug
         )
 
     if not success:
@@ -297,7 +289,6 @@ def run_osm2pgsql_standard(
     input_file,
     out_path,
     flex_path,
-    ram,
     skip_nested,
     import_mode,
     debug
@@ -310,14 +301,9 @@ def run_osm2pgsql_standard(
     input_file : str
     out_path : str
     flex_path : str
-    ram : float
     skip_nested : boolean
     import_mode : helpers.helpers.ImportMode
     debug : boolean
-    schema_name : str
-    config : ConfigLoader
-        Configuration object to pass to post-processing
-    skip_verify_checksum: boolean
 
     Returns
     ---------------------------
@@ -333,14 +319,19 @@ def run_osm2pgsql_standard(
     else:
         pbf_filename = config.region.input_file
 
-    osm2pgsql_command = rec.osm2pgsql_recommendation(
-        ram=config.processing.ram,
-        pbf_filename=pbf_filename,
-        out_path=out_path,
-        import_mode=config.import_mode
-    )
+    # Generate Lua configuration module first
+    with generate_lua_config() as lua_config_path:
+        # Then generate Lua style file
+        with lua_style() as tmp_lua_style:
+            osm2pgsql_command = rec.osm2pgsql_recommendation(
+                ram=config.processing.ram,
+                pbf_filename=pbf_filename,
+                out_path=out_path,
+                import_mode=config.import_mode,
+                pgosm_layer_set=tmp_lua_style.name
+            )
 
-    run_osm2pgsql(osm2pgsql_command=osm2pgsql_command, flex_path=flex_path, debug=debug)
+            run_osm2pgsql(osm2pgsql_command=osm2pgsql_command, flex_path=flex_path, debug=debug)
 
     if not skip_nested:
         # Don't expect user to use --skip-nested when place isn't included
@@ -374,16 +365,125 @@ def lua_style():
     config = get_config()
     paths = get_paths()
 
-    with TemporaryFile(mode="w") as tmp_lua_style:
+    with NamedTemporaryFile(mode="w", delete=True, suffix=".lua") as tmp_lua_style:
         style_config = config.layerset.load_layerset_ini(paths["flex_path"])
 
         for key, value in style_config.items():
             if value.lower() == "true":
-                tmp_lua_style.write(f"print('Including {key}')")
-                tmp_lua_style.write(f'require "style.{key}"')
-                tmp_lua_style.write("\n")
+                tmp_lua_style.write(f"print('Including {key}')\n")
+                tmp_lua_style.write(f'require "style.{key}"\n')
+
+        tmp_lua_style.flush()
 
         yield tmp_lua_style
+
+
+def _write_index_config(file_handle, flex_path: Path, layer_name: str):
+    """Helper to write index configuration for a layer to Lua format.
+
+    Parameters
+    ----------
+    file_handle : file object
+        Open file handle to write to
+    flex_path : Path
+        Path to flex-config directory containing indexes/
+    layer_name : str
+        Name of the layer (e.g., 'poi', 'building')
+    """
+    index_file = flex_path / "indexes" / f"{layer_name}.ini"
+
+    if not index_file.exists():
+        # No index config - write empty config
+        file_handle.write("{}")
+        return
+
+    config = configparser.ConfigParser()
+    config.read(index_file)
+
+    file_handle.write("{\n")
+
+    # Write each geometry type section
+    for section in ['point', 'line', 'polygon', 'all']:
+        if section in config:
+            file_handle.write(f"            {section} = {{\n")
+            for key, value in config[section].items():
+                # Convert string boolean to Lua boolean, handle other types
+                if value.lower() in ['true', 'false']:
+                    lua_value = value.lower()
+                else:
+                    # Quote string values
+                    lua_value = f"'{value}'"
+                file_handle.write(f"                {key} = {lua_value},\n")
+            file_handle.write("            },\n")
+
+    file_handle.write("        }")
+
+
+@contextlib.contextmanager
+def generate_lua_config():
+    """
+    Generates temporary Lua configuration module with all config values.
+
+    Replaces INI file parsing and environment variable reading in Lua scripts.
+    Creates a pgosm_config.lua module in the flex_path directory that exports
+    a configuration table with:
+    - Core config (srid, schema_name, pgosm_date, language)
+    - Enabled layers (from layerset INI)
+    - Index specifications (from indexes/*.ini files)
+
+    Yields
+    ------
+    str
+        Path to generated pgosm_config.lua module
+    """
+    config = get_config()
+    paths = get_paths()
+    flex_path = paths["flex_path"]
+
+    tmp_config = io.StringIO()
+
+    # Write Lua module header
+    tmp_config.write("-- Auto-generated configuration module\n")
+    tmp_config.write("-- DO NOT EDIT - generated by pgosm-flex Python\n\n")
+    tmp_config.write("local config = {\n")
+
+    # Core configuration values
+    tmp_config.write(f"    srid = {config.processing.srid},\n")
+    tmp_config.write(f"    schema_name = '{config.processing.schema_name}',\n")
+    tmp_config.write(f"    pgosm_date = '{config.region.pgosm_date}',\n")
+    tmp_config.write(f"    pgosm_language = '{config.processing.language}',\n\n")
+
+    # Load layerset configuration
+    style_config = config.layerset.load_layerset_ini(flex_path)
+
+    tmp_config.write("    layers = {\n")
+    for layer, enabled in style_config.items():
+        enabled_bool = enabled.lower() == "true"
+        tmp_config.write(f"        {layer} = {str(enabled_bool).lower()},\n")
+    tmp_config.write("    },\n\n")
+
+    # Load index configurations for all enabled layers
+    tmp_config.write("    indexes = {\n")
+    for layer, enabled in style_config.items():
+        if enabled.lower() == "true":
+            tmp_config.write(f"        {layer} = ")
+            _write_index_config(tmp_config, flex_path, layer)
+            tmp_config.write(",\n")
+    tmp_config.write("    },\n")
+
+    tmp_config.write("}\n\n")
+    tmp_config.write("return config\n")
+
+    # Get the string contents and set as environment variable
+    os.environ["PGOSM_LUA_CONFIG"] = tmp_config.getvalue()
+    tmp_config.close()
+
+    try:
+        yield
+    finally:
+        # Unset environment variable after usage
+        if "PGOSM_LUA_CONFIG" in os.environ:
+            del os.environ["PGOSM_LUA_CONFIG"]
 
 
 def run_replication_update(skip_nested, flex_path):
@@ -402,23 +502,25 @@ def run_replication_update(skip_nested, flex_path):
     logger = logging.getLogger("pgosm-flex")
     conn_string = db.connection_string()
 
-    with lua_style() as tmp_lua_style:
-        update_cmd = f"""
+    # Generate Lua configuration module first
+    with generate_lua_config() as lua_config_path:
+        with lua_style() as tmp_lua_style:
+            update_cmd = f"""
     osm2pgsql-replication update -d $PGOSM_CONN \
         -- \
-        --output=flex --style={str(tmp_lua_style)} \
+        --output=flex --style={tmp_lua_style.name} \
         --slim
         """
 
-        update_cmd = update_cmd.replace("-d $PGOSM_CONN", f"-d {conn_string}")
-        returncode = helpers.run_command_via_subprocess(
-            cmd=update_cmd.split(), cwd=flex_path, print_to_log=True
-        )
+            update_cmd = update_cmd.replace("-d $PGOSM_CONN", f"-d {conn_string}")
+            returncode = helpers.run_command_via_subprocess(
+                cmd=update_cmd.split(), cwd=flex_path, print_to_log=True
+            )
 
-        if returncode != 0:
-            err_msg = f"Failure. Return code: {returncode}"
-            logger.warning(err_msg)
-            return False
+            if returncode != 0:
+                err_msg = f"Failure. Return code: {returncode}"
+                logger.warning(err_msg)
+                return False
 
     db.osm2pgsql_replication_finish(skip_nested=skip_nested)
     logger.info("osm2pgsql-replication update complete")

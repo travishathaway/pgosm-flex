@@ -1,5 +1,8 @@
 """Unit tests to cover the DB module."""
 
+import io
+import os
+import subprocess
 import pytest
 from pathlib import Path
 
@@ -205,3 +208,271 @@ def test_layerset_include_place_returns_true_when_place_true_in_ini(
         actual = pgosm_flex.layerset_include_place(flex_path=paths["flex_path"])
         expected = True
         assert expected == actual
+
+
+# Tests for lua config generation functionality
+
+
+def test_write_index_config_with_existing_file(default_config):
+    """Test _write_index_config() with an existing index INI file."""
+    with default_config:
+        paths = pgosm_flex.get_paths()
+        flex_path = paths["flex_path"]
+
+        # Use a StringIO to capture the output
+        output = io.StringIO()
+
+        # Test with a layer that has an index file (poi)
+        pgosm_flex._write_index_config(output, flex_path, "poi")
+
+        result = output.getvalue()
+
+        # Verify it generates a valid Lua table structure
+        assert result.startswith("{")
+        assert result.endswith("}")
+        # Should contain at least one geometry type section
+        assert "point" in result or "line" in result or "polygon" in result or "all" in result
+
+
+def test_write_index_config_with_missing_file(default_config):
+    """Test _write_index_config() gracefully handles missing index files."""
+    with default_config:
+        paths = pgosm_flex.get_paths()
+        flex_path = paths["flex_path"]
+
+        output = io.StringIO()
+
+        # Test with a nonexistent layer
+        pgosm_flex._write_index_config(output, flex_path, "nonexistent_layer")
+
+        result = output.getvalue()
+
+        # Should return empty table for missing file
+        assert result == "{}"
+
+
+def test_generate_lua_config_sets_environment_variable(default_config):
+    """Test that generate_lua_config() sets the PGOSM_LUA_CONFIG environment variable."""
+    with default_config:
+        # Ensure env var is not set initially
+        if "PGOSM_LUA_CONFIG" in os.environ:
+            del os.environ["PGOSM_LUA_CONFIG"]
+
+        with pgosm_flex.generate_lua_config():
+            # Should be set within the context
+            assert "PGOSM_LUA_CONFIG" in os.environ
+            assert len(os.environ["PGOSM_LUA_CONFIG"]) > 0
+
+        # Should be cleaned up after context exit
+        assert "PGOSM_LUA_CONFIG" not in os.environ
+
+
+def test_generate_lua_config_contains_core_values(default_config):
+    """Test that generated config contains all core configuration values."""
+    with default_config:
+        with pgosm_flex.generate_lua_config():
+            lua_config = os.environ["PGOSM_LUA_CONFIG"]
+
+            # Check for core config values
+            assert "srid = 3857" in lua_config
+            assert "schema_name = 'osm'" in lua_config
+            assert f"pgosm_date = '{PGOSM_DATE}'" in lua_config
+            assert "pgosm_language = " in lua_config
+
+
+def test_generate_lua_config_contains_layers_section(default_config):
+    """Test that generated config contains the layers section."""
+    with default_config:
+        with pgosm_flex.generate_lua_config():
+            lua_config = os.environ["PGOSM_LUA_CONFIG"]
+
+            # Should have layers section
+            assert "layers = {" in lua_config
+            # Should have some layers defined
+            assert "amenity = " in lua_config
+            assert "building = " in lua_config
+            assert "poi = " in lua_config
+            # Values should be Lua booleans
+            assert "true" in lua_config or "false" in lua_config
+
+
+def test_generate_lua_config_contains_indexes_section(default_config):
+    """Test that generated config contains the indexes section."""
+    with default_config:
+        with pgosm_flex.generate_lua_config():
+            lua_config = os.environ["PGOSM_LUA_CONFIG"]
+
+            # Should have indexes section
+            assert "indexes = {" in lua_config
+
+
+def test_generate_lua_config_returns_valid_lua(default_config):
+    """Test that generated config returns a valid Lua table."""
+    with default_config:
+        with pgosm_flex.generate_lua_config():
+            lua_config = os.environ["PGOSM_LUA_CONFIG"]
+
+            # Should start with comment and return config
+            assert lua_config.startswith("-- Auto-generated")
+            assert "return config" in lua_config
+
+
+def test_generate_lua_config_valid_lua_syntax(default_config):
+    """Test that generated config has valid Lua syntax using luac."""
+    with default_config:
+        with pgosm_flex.generate_lua_config():
+            lua_config = os.environ["PGOSM_LUA_CONFIG"]
+
+            # Try to validate syntax with luac if available
+            try:
+                result = subprocess.run(
+                    ["luac", "-p", "-"],
+                    input=lua_config,
+                    text=True,
+                    capture_output=True,
+                    timeout=5
+                )
+                # If luac is available, check it validates successfully
+                assert result.returncode == 0, f"Lua syntax error: {result.stderr}"
+            except FileNotFoundError:
+                # luac not available, skip this check
+                pytest.skip("luac not available for syntax validation")
+
+
+def test_generate_lua_config_can_be_loaded_by_lua(default_config):
+    """Test that Lua can actually load and execute the generated config."""
+    with default_config:
+        with pgosm_flex.generate_lua_config():
+            # Create a simple Lua test script that loads the config
+            test_script = '''
+local config_code = os.getenv("PGOSM_LUA_CONFIG")
+if not config_code then
+    os.exit(1)
+end
+
+local func, err = load(config_code)
+if not func then
+    print("Load error: " .. err)
+    os.exit(1)
+end
+
+local config = func()
+if not config then
+    print("Config is nil")
+    os.exit(1)
+end
+
+-- Verify config has expected structure
+if not config.srid then os.exit(1) end
+if not config.schema_name then os.exit(1) end
+if not config.layers then os.exit(1) end
+if not config.indexes then os.exit(1) end
+
+os.exit(0)
+            '''
+
+            try:
+                result = subprocess.run(
+                    ["lua", "-e", test_script],
+                    env=os.environ.copy(),
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                assert result.returncode == 0, f"Lua execution failed: {result.stderr}"
+            except FileNotFoundError:
+                pytest.skip("lua interpreter not available for testing")
+
+
+def test_generate_lua_config_with_custom_language(default_config):
+    """Test that custom language is included in generated config."""
+    # Create config with custom language
+    test_config = config.config_context(
+        config.init_config(
+            {
+                "region": REGION_US,
+                "subregion": SUBREGION_DC,
+                "srid": "3857",
+                "language": "es",  # Spanish
+                "pgosm_date": PGOSM_DATE,
+                "layerset": LAYERSET,
+                "layerset_path": None,
+                "schema_name": "osm",
+                "skip_nested": True,
+                "ram": 8,
+            }
+        )
+    )
+
+    with test_config:
+        with pgosm_flex.generate_lua_config():
+            lua_config = os.environ["PGOSM_LUA_CONFIG"]
+            assert "pgosm_language = 'es'" in lua_config
+
+
+def test_generate_lua_config_with_custom_srid(default_config):
+    """Test that custom SRID is included in generated config."""
+    # Create config with custom SRID
+    test_config = config.config_context(
+        config.init_config(
+            {
+                "region": REGION_US,
+                "subregion": SUBREGION_DC,
+                "srid": "4326",  # WGS84
+                "language": None,
+                "pgosm_date": PGOSM_DATE,
+                "layerset": LAYERSET,
+                "layerset_path": None,
+                "schema_name": "osm",
+                "skip_nested": True,
+                "ram": 8,
+            }
+        )
+    )
+
+    with test_config:
+        with pgosm_flex.generate_lua_config():
+            lua_config = os.environ["PGOSM_LUA_CONFIG"]
+            assert "srid = 4326" in lua_config
+
+
+def test_generate_lua_config_with_custom_schema(default_config):
+    """Test that custom schema name is included in generated config."""
+    # Create config with custom schema
+    test_config = config.config_context(
+        config.init_config(
+            {
+                "region": REGION_US,
+                "subregion": SUBREGION_DC,
+                "srid": "3857",
+                "language": None,
+                "pgosm_date": PGOSM_DATE,
+                "layerset": LAYERSET,
+                "layerset_path": None,
+                "schema_name": "custom_schema",
+                "skip_nested": True,
+                "ram": 8,
+            }
+        )
+    )
+
+    with test_config:
+        with pgosm_flex.generate_lua_config():
+            lua_config = os.environ["PGOSM_LUA_CONFIG"]
+            assert "schema_name = 'custom_schema'" in lua_config
+
+
+def test_generate_lua_config_cleanup_on_exception(default_config):
+    """Test that environment variable is cleaned up even if exception occurs."""
+    with default_config:
+        try:
+            with pgosm_flex.generate_lua_config():
+                # Verify it's set
+                assert "PGOSM_LUA_CONFIG" in os.environ
+                # Simulate an exception
+                raise ValueError("Test exception")
+        except ValueError:
+            pass
+
+        # Should still be cleaned up after exception
+        assert "PGOSM_LUA_CONFIG" not in os.environ

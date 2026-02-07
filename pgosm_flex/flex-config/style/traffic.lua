@@ -1,9 +1,9 @@
 require "helpers"
 
-local index_spec_file = 'indexes/traffic.ini'
-local indexes_point = get_indexes_from_spec(index_spec_file, 'point')
-local indexes_line = get_indexes_from_spec(index_spec_file, 'line')
-local indexes_polygon = get_indexes_from_spec(index_spec_file, 'polygon')
+local layer_name = 'traffic'
+local indexes_point = get_indexes_from_spec(layer_name, 'point')
+local indexes_line = get_indexes_from_spec(layer_name, 'line')
+local indexes_polygon = get_indexes_from_spec(layer_name, 'polygon')
 
 
 local tables = {}

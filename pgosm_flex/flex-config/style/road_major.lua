@@ -1,7 +1,7 @@
 require "helpers"
 
-local index_spec_file = 'indexes/road_major.ini'
-local indexes_line = get_indexes_from_spec(index_spec_file, 'line')
+local layer_name = 'road_major'
+local indexes_line = get_indexes_from_spec(layer_name, 'line')
 
 
 local tables = {}

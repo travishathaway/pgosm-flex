@@ -215,3 +215,25 @@ need to spend some time running the `pgosm-flex` command manually to address all
 The first one I want to tackle is the commands that attempts to drop the database completely. I'd
 like to have a lighter touch here and simply remove all the tables instead and prompt the user
 before doing so while also adding a `-f/--force` option.
+
+
+## 2026-02-07: everything kind of works now
+
+I now have a very basic happy path working for the tool. I'm using the `tests/data/district-of-columbia-2021-01-13.osm.pbf`
+file to make sure that all the importing logic works. Now, I'm ready to automate this with my own integration
+tests.
+
+### No more lua dependencies
+
+I really wanted to ensure that the lua scripts had zero external dependencies. This makes it, so I don't
+have to install them separately. In conda environment this is definitely possible with `luarocks`, but
+I want to avoid it to have fewer moving parts.
+
+To get rid of it, I now dynamic load the configuration for the lua scripts in an environment variable
+called `PGOSM_LUA_CONFIG`. This does present certain security issues (config values can be coerced into
+executing arbitrary code now), but from now, I'm not worried about it and will make sure to mention this
+later in any audits I do of my own work.
+
+I did think about writing a config file to a temp location and then just loading that, but I think the
+same security problems exist, and I would additionally have to handle dynamically loading this from
+within the lua scripts themself.

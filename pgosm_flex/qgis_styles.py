@@ -5,6 +5,7 @@ import os
 import subprocess
 
 from . import db
+from .config import get_config
 
 
 LOGGER = logging.getLogger("pgosm-flex")
@@ -20,7 +21,8 @@ def load_qgis_styles(db_path, db_name):
     db_name : str
     """
     LOGGER.info(f"Load QGIS styles to database {db_name}...")
-    conn_string = os.environ["PGOSM_CONN"]
+    config = get_config()
+    conn_string = config.database.connection_string()
 
     create_layer_style_table(db_path=db_path, conn_string=conn_string)
     populate_layer_style_staging(db_path=db_path, conn_string=conn_string)

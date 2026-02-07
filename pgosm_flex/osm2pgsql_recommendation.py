@@ -5,14 +5,14 @@ project.
 import logging
 import os
 
-from . import db, helpers, osm2pgsql_tuner as tuner
-from .config import get_config
+from . import helpers, osm2pgsql_tuner as tuner
+from .config import get_config, ImportConfig
 
 LOGGER = logging.getLogger("pgosm-flex")
 
 
 def osm2pgsql_recommendation(
-    ram: float, pbf_filename: str, out_path: str, import_mode: helpers.ImportMode
+    ram: float, pbf_filename: str, out_path: str, import_mode: ImportConfig, pgosm_layer_set: str
 ) -> str:
     """Returns recommended osm2pgsql command from the osm2pgsql-tuner
     Python module: https://pypi.org/project/osm2pgsql-tuner/
@@ -26,7 +26,8 @@ def osm2pgsql_recommendation(
         Total system RAM available in GB
     pbf_filename : str
     out_path : str
-    import_mode : helpers.ImportMode
+    import_mode : ImportConfig
+    pgosm_layer_set : str
 
     Returns
     ----------------------
@@ -34,16 +35,13 @@ def osm2pgsql_recommendation(
     """
     system_ram_gb = ram
 
-    if not os.path.isabs(pbf_filename):
-        pbf_file = os.path.join(out_path, pbf_filename)
-    else:
-        pbf_file = pbf_filename
-
-    osm_pbf_gb = os.path.getsize(pbf_file) / 1024 / 1024 / 1024
+    osm_pbf_gb = os.path.getsize(pbf_filename) / 1024 / 1024 / 1024
     LOGGER.debug(f"PBF size (GB): {osm_pbf_gb}")
 
+    osm_pbf_abs_path = os.path.abspath(pbf_filename)
+
     osm2pgsql_cmd = get_recommended_script(
-        system_ram_gb, osm_pbf_gb, import_mode, pbf_file, out_path
+        system_ram_gb, osm_pbf_gb, import_mode, osm_pbf_abs_path, out_path, pgosm_layer_set
     )
     return osm2pgsql_cmd
 
@@ -51,9 +49,10 @@ def osm2pgsql_recommendation(
 def get_recommended_script(
     system_ram_gb: float,
     osm_pbf_gb: float,
-    import_mode: helpers.ImportMode,
+    import_mode: ImportConfig,
     pbf_filename: str,
     output_path: str,
+    pgosm_layer_set: str
 ) -> str:
     """Generates recommended osm2pgsql command from osm2pgsql-tuner.
 
@@ -65,6 +64,7 @@ def get_recommended_script(
     pbf_filename : str
         Can be filename or absolute path.
     output_path : str
+    pgosm_layer_set : str
 
     Returns
     -------------------------------
@@ -85,11 +85,12 @@ def get_recommended_script(
         slim_no_drop=import_mode.slim_no_drop,
         append_first_run=import_mode.append_first_run,
         ssd=True,
+        pgosm_layer_set=pgosm_layer_set
     )
 
     osm2pgsql_cmd = rec.get_osm2pgsql_command(pbf_path=pbf_filename)
 
-    osm2pgsql_cmd = osm2pgsql_cmd.replace("~/pgosm-data", output_path)
+    osm2pgsql_cmd = osm2pgsql_cmd.replace("~/pgosm-data", str(output_path))
 
     LOGGER.debug(f"Generic command to run: {osm2pgsql_cmd}")
 
@@ -97,4 +98,5 @@ def get_recommended_script(
     conn_string = config.database.connection_string()
     osm2pgsql_cmd = osm2pgsql_cmd.replace("-d $PGOSM_CONN", f"-d {conn_string}")
     # Warning: Do not print() this string any more! Includes password
+
     return osm2pgsql_cmd

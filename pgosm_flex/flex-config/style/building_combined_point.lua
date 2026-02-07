@@ -1,8 +1,8 @@
 require "helpers"
 require "style.building_helpers"
 
-local index_spec_file = 'indexes/building_combined_point.ini'
-local indexes_point = get_indexes_from_spec(index_spec_file, 'point')
+local layer_name = 'building_combined_point'
+local indexes_point = get_indexes_from_spec(layer_name, 'point')
 
 
 local tables = {}

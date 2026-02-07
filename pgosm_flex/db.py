@@ -226,7 +226,7 @@ def start_import(osm2pgsql_version, schema_name):
         "git_info": __version__,
         "osm2pgsql_version": osm2pgsql_version,
         "import_mode": config.import_mode.as_json(),
-        "input_file": config.region.input_file,
+        "input_file": str(config.region.input_file),
     }
 
     sql_raw = """
@@ -297,19 +297,35 @@ def drop_pgosm_db():
     """
     config = get_config()
 
-    sql_stmt = sql.SQL("DROP DATABASE IF EXISTS {}").format(
-        sql.Identifier(config.database.database)
-    )
-
-    conn = get_db_conn(conn_string=config.database.connection_string())
-    conn.autocommit = True
+    sql_stmt = sql.SQL("""
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = {}
+          AND table_type = 'BASE TABLE'
+        ORDER BY table_name
+    """).format(config.processing.schema_name)
 
     LOGGER.debug("Setting Pg conn to enable autocommit - required for drop/create DB")
 
-    conn.execute(sql_stmt)
+    with get_db_conn(conn_string=config.database.connection_string()) as conn:
+        cursor = conn.cursor()
+        cursor.execute(sql_stmt)
+        results = cursor.fetchall()
 
-    conn.close()
-    LOGGER.info("Removed pgosm database")
+        if len(results) > 0:
+            if config.import_mode.force:
+                LOGGER.info("Force drop all tables")
+                for table in results:
+                    sql_drop_table = sql.SQL("DROP TABLE IF EXISTS {}.{} CASCADE").format(
+                        sql.Identifier(config.processing.schema_name),
+                        sql.Identifier(table[0])
+                    )
+                    cursor.execute(sql_drop_table)
+                conn.close()
+                LOGGER.info(f"Dropped tables in schema {config.processing.schema_name}")
+            else:
+                LOGGER.error("Schema not empty; use --force to remove existing tables")
+                sys.exit(1)
 
 
 def create_pgosm_db():
@@ -617,7 +633,7 @@ def pgosm_nested_admin_polygons(flex_path: str, schema_name: str):
     # Populate the table
     sql_raw_1 = f"CALL {schema_name}.populate_place_polygon_nested();"
 
-    conn_string = config.database_connection_string()
+    conn_string = config.database.connection_string()
     cmds = ["psql", "-d", conn_string, "-c", sql_raw_1]
     LOGGER.info(
         "Populating place_polygon_nested table (osm.populate_place_polygon_nested() )"
@@ -789,10 +805,7 @@ def log_import_message(import_id: int, msg: str, schema_name: str):
     msg : str
     schema_name: str
     """
-    try:
-        pbf_timestamp = os.environ["PBF_TIMESTAMP"]
-    except KeyError:
-        pbf_timestamp = os.environ["PGOSM_DATE"]
+    config = get_config()
 
     sql_raw = """
 UPDATE {schema_name}.pgosm_flex
@@ -802,8 +815,12 @@ UPDATE {schema_name}.pgosm_flex
 ;
 """
     sql_raw = sql_raw.format(schema_name=schema_name)
-    with get_db_conn(conn_string=os.environ["PGOSM_CONN"]) as conn:
-        params = {"import_id": import_id, "msg": msg, "pbf_timestamp": pbf_timestamp}
+    with get_db_conn(conn_string=config.database.connection_string()) as conn:
+        params = {
+            "import_id": import_id,
+            "msg": msg,
+            "pbf_timestamp": config.region.pgosm_date
+        }
         cur = conn.cursor()
         cur.execute(sql_raw, params=params)
 

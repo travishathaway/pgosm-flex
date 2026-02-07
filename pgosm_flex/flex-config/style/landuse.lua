@@ -1,8 +1,8 @@
 require "helpers"
 
-local index_spec_file = 'indexes/landuse.ini'
-local indexes_point = get_indexes_from_spec(index_spec_file, 'point')
-local indexes_polygon = get_indexes_from_spec(index_spec_file, 'polygon')
+local layer_name = 'landuse'
+local indexes_point = get_indexes_from_spec(layer_name, 'point')
+local indexes_polygon = get_indexes_from_spec(layer_name, 'polygon')
 
 
 local tables = {}
