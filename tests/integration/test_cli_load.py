@@ -4,41 +4,13 @@ Integration test for pgosm-flex CLI command with table verification.
 Tests the complete workflow: CLI invocation -> osm2pgsql processing -> table creation.
 """
 
-import re
 import pytest
 import psycopg
 from click.testing import CliRunner
+from importlib import resources
 from pathlib import Path
 
 from pgosm_flex.main import run_pgosm_flex
-
-
-def parse_connection_string(conn_str: str) -> dict:
-    """
-    Parse PostgreSQL connection string into components.
-
-    Parameters
-    ----------
-    conn_str : str
-        Connection string like "postgresql://user@localhost:5432/dbname?params"
-
-    Returns
-    -------
-    dict
-        Dictionary with keys: user, host, port, dbname
-    """
-    # Format: postgresql://user@host:port/dbname?application_name=...
-    pattern = r"postgresql://([^@]+)@([^:]+):(\d+)/([^?]+)"
-    match = re.match(pattern, conn_str)
-    if not match:
-        raise ValueError(f"Cannot parse connection string: {conn_str}")
-
-    return {
-        "user": match.group(1),
-        "host": match.group(2),
-        "port": match.group(3),
-        "dbname": match.group(4),
-    }
 
 
 @pytest.mark.integration
@@ -58,20 +30,10 @@ def test_cli_load_dc_data(test_database, monkeypatch):
     ----------
     test_database : str
         Database connection string from conftest.py fixture
-    monkeypatch : pytest.MonkeyPatch
-        Pytest fixture for patching environment variables
     """
-    # Step 1: Setup Environment Variables
-    # Parse connection string: postgresql://user@host:port/dbname?params
-    conn_parts = parse_connection_string(test_database)
-    monkeypatch.setenv("POSTGRES_HOST", conn_parts["host"])
-    monkeypatch.setenv("POSTGRES_PORT", conn_parts["port"])
-    monkeypatch.setenv("POSTGRES_DB", conn_parts["dbname"])
-    monkeypatch.setenv("POSTGRES_USER", conn_parts["user"])
 
-    # Step 2: Invoke CLI Command
     runner = CliRunner()
-    pbf_file = "/Users/travishathaway/dev/pgosm-flex/tests/data/district-of-columbia-2021-01-13.osm.pbf"
+    pbf_file = resources.files().joinpath("../../tests/data/district-of-columbia-2021-01-13.osm.pbf")
 
     # Verify PBF file exists
     assert Path(pbf_file).exists(), f"PBF file not found: {pbf_file}"
@@ -82,6 +44,12 @@ def test_cli_load_dc_data(test_database, monkeypatch):
         "--layerset", "default",
         "--skip-nested",  # Skip nested polygon calculation for speed
         "--skip-qgis-style",  # Skip QGIS style import
+        "--subregion", "district-of-columbia",
+        "--region", "north-america",
+        "--db-name", test_database.test_db,
+        "--db-port", test_database.port,
+        "--db-user", test_database.user,
+        "--db-host", test_database.host
     ])
 
     # Check CLI execution succeeded
@@ -89,7 +57,11 @@ def test_cli_load_dc_data(test_database, monkeypatch):
 
     # Step 3: Verify Tables Created
     # Connect to test database
-    conn = psycopg.connect(test_database)
+    conn = psycopg.connect(
+        f"dbname={test_database.test_db} user={test_database.user} "
+        f"port={test_database.port} host={test_database.host}"
+    )
+
     try:
         with conn.cursor() as cursor:
             # Query for all tables in osm schema

@@ -134,6 +134,47 @@ from .config import init_config, get_config
     default=None,
     help='base path containing files necessary for import. default "/app"',
 )
+@click.option(
+    "--db-host",
+    "--pg-host",
+    "pg_host",
+    default=None,
+    envvar="POSTGRES_HOST",
+    help="PostgreSQL host. Defaults to localhost",
+)
+@click.option(
+    "--db-port",
+    "--pg-port",
+    "pg_port",
+    default=None,
+    type=int,
+    envvar="POSTGRES_PORT",
+    help="PostgreSQL port. Defaults to 5432",
+)
+@click.option(
+    "--db-name",
+    "--pg-dbname",
+    "pg_dbname",
+    default=None,
+    envvar="POSTGRES_DB",
+    help="PostgreSQL database name. Defaults to pgosm",
+)
+@click.option(
+    "--db-user",
+    "--pg-user",
+    "pg_user",
+    default=None,
+    envvar="POSTGRES_USER",
+    help="PostgreSQL user. Defaults to postgres",
+)
+@click.option(
+    "--db-password",
+    "--pg-password",
+    "pg_password",
+    default=None,
+    envvar="POSTGRES_PASSWORD",
+    help="PostgreSQL password. Optional.",
+)
 def run_pgosm_flex(
     ram,
     region,
@@ -154,6 +195,11 @@ def run_pgosm_flex(
     update,
     base_path,
     skip_verify_checksum,
+    pg_host,
+    pg_port,
+    pg_dbname,
+    pg_user,
+    pg_password,
 ):
     """Run PgOSM Flex to automate osm2pgsql flex processing."""
     # Collect CLI args into dict
@@ -177,6 +223,11 @@ def run_pgosm_flex(
         "update": update,
         "base_path": base_path,
         "skip_verify_checksum": skip_verify_checksum,
+        "pg_host": pg_host,
+        "pg_port": pg_port,
+        "pg_dbname": pg_dbname,
+        "pg_user": pg_user,
+        "pg_password": pg_password,
     }
 
     # Load configuration with precedence: CLI > TOML > Env > Defaults

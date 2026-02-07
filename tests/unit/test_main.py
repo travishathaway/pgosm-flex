@@ -210,6 +210,140 @@ def test_layerset_include_place_returns_true_when_place_true_in_ini(
         assert expected == actual
 
 
+# Tests for database CLI options
+
+
+def test_database_cli_options_with_defaults():
+    """Test that database options default correctly when not specified."""
+    test_config = config.config_context(
+        config.init_config(
+            {
+                "region": REGION_US,
+                "subregion": SUBREGION_DC,
+                "srid": "3857",
+                "language": None,
+                "pgosm_date": PGOSM_DATE,
+                "layerset": LAYERSET,
+                "layerset_path": None,
+                "schema_name": "osm",
+                "skip_nested": True,
+                "ram": 8,
+                # Database options not specified - should use defaults
+            }
+        )
+    )
+
+    with test_config:
+        cfg = config.get_config()
+        assert cfg.database.host == "localhost"
+        assert cfg.database.port == 5432
+        assert cfg.database.database == "pgosm"
+        assert cfg.database.user == "postgres"
+        assert cfg.database.password is None
+
+
+def test_database_cli_options_with_custom_values():
+    """Test that database CLI options override defaults."""
+    test_config = config.config_context(
+        config.init_config(
+            {
+                "region": REGION_US,
+                "subregion": SUBREGION_DC,
+                "srid": "3857",
+                "language": None,
+                "pgosm_date": PGOSM_DATE,
+                "layerset": LAYERSET,
+                "layerset_path": None,
+                "schema_name": "osm",
+                "skip_nested": True,
+                "ram": 8,
+                # Custom database options
+                "pg_host": "custom-host",
+                "pg_port": 5433,
+                "pg_dbname": "custom_db",
+                "pg_user": "custom_user",
+                "pg_password": "custom_password",
+            }
+        )
+    )
+
+    with test_config:
+        cfg = config.get_config()
+        assert cfg.database.host == "custom-host"
+        assert cfg.database.port == 5433
+        assert cfg.database.database == "custom_db"
+        assert cfg.database.user == "custom_user"
+        assert cfg.database.password.get_secret_value() == "custom_password"
+
+
+def test_database_connection_string_with_custom_params():
+    """Test that connection string includes custom database parameters."""
+    test_config = config.config_context(
+        config.init_config(
+            {
+                "region": REGION_US,
+                "subregion": SUBREGION_DC,
+                "srid": "3857",
+                "language": None,
+                "pgosm_date": PGOSM_DATE,
+                "layerset": LAYERSET,
+                "layerset_path": None,
+                "schema_name": "osm",
+                "skip_nested": True,
+                "ram": 8,
+                "pg_host": "db.example.com",
+                "pg_port": 5433,
+                "pg_dbname": "my_osm",
+                "pg_user": "osm_user",
+                "pg_password": "secret123",
+            }
+        )
+    )
+
+    with test_config:
+        cfg = config.get_config()
+        conn_str = cfg.database.connection_string()
+
+        # Check connection string contains all custom values
+        assert "db.example.com" in conn_str
+        assert "5433" in conn_str
+        assert "my_osm" in conn_str
+        assert "osm_user" in conn_str
+        assert "secret123" in conn_str
+        assert "application_name=pgosm-flex" in conn_str
+
+
+def test_database_connection_string_without_password():
+    """Test connection string format when no password is provided."""
+    test_config = config.config_context(
+        config.init_config(
+            {
+                "region": REGION_US,
+                "subregion": SUBREGION_DC,
+                "srid": "3857",
+                "language": None,
+                "pgosm_date": PGOSM_DATE,
+                "layerset": LAYERSET,
+                "layerset_path": None,
+                "schema_name": "osm",
+                "skip_nested": True,
+                "ram": 8,
+                "pg_host": "localhost",
+                "pg_user": "testuser",
+                # No password
+            }
+        )
+    )
+
+    with test_config:
+        cfg = config.get_config()
+        conn_str = cfg.database.connection_string()
+
+        # Should not have colon after username when no password
+        assert "testuser@localhost" in conn_str
+        assert ":@" not in conn_str  # No password separator
+
+
 # Tests for lua config generation functionality
 
 

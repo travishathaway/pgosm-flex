@@ -1,4 +1,5 @@
 """Shared fixtures for integration tests."""
+from typing import NamedTuple
 
 import pytest
 import psycopg
@@ -12,6 +13,14 @@ TEST_PG_PORT = 65431  # Separate from dev server (65432)
 TEST_PG_USER = "postgres"
 TEST_DB_MAIN = "pgosm"
 TEST_DB_TESTS = "pgosm_tests"
+
+
+class DBInfo(NamedTuple):
+    port: int
+    user: str
+    host: str
+    main_db: str
+    test_db: str
 
 
 @pytest.fixture(scope="session")
@@ -96,9 +105,13 @@ def test_database(postgres_server):
     finally:
         conn.close()
 
-    # Return connection string for test database
-    app_str = "?application_name=pgosm-flex-tests"
-    yield f"{test_conn_str}{app_str}"
+    yield DBInfo(
+        user=TEST_PG_USER,
+        host="localhost",
+        port=TEST_PG_PORT,
+        main_db=TEST_DB_MAIN,
+        test_db=TEST_DB_TESTS,
+    )
 
     # Cleanup: drop test database
     postgres_server.pg_mgr.drop_database(TEST_DB_TESTS)

@@ -10,6 +10,12 @@ WARNING: These tests are destructive - they drop and recreate the
 pgosm_tests database.
 
 Run with: pytest -m integration tests/integration/test_extra_loads.py
+
+TODO:
+    As I add more and more test scenarios into `test_cli_load.py`, I think it
+    will make these tests redundant because the other tests will thoroughly test
+    all the different loading scenarios.
+
 """
 
 import pytest
@@ -90,7 +96,10 @@ class TestExtraRegionLoads:
         )
 
         # Verify data was loaded by checking at least one table exists
-        conn = psycopg.connect(test_database)
+        conn = psycopg.connect(
+            f"dbname={test_database.test_db} user={test_database.user} "
+            f"port={test_database.port} host={test_database.host}"
+        )
         try:
             with conn.cursor() as cur:
                 # Check if osm schema has tables
