@@ -5,7 +5,7 @@ description = "OpenStreetMap data import tool for PostgreSQL/PostGIS"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "osmium>=3.4.1",
+    "osmium>=3.4.1",  # TODO: will eventually be available as a conda-forge dependency
 ]
 
 [project.scripts]
@@ -17,13 +17,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["pgosm_flex"]
-
-[dependency-groups]
-dev = [
-    "coverage>=7.13.1",
-    "pytest>=7.0",
-    "pytest-timeout>=2.1",
-]
 
 [tool.pytest.ini_options]
 minversion = "7.0"

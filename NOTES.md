@@ -205,7 +205,7 @@ relatively small.
 Another thing I can move on to is testing the update/replication functionality. I think this wasn't
 covered at all in the original integration tests and could be a nice addition.
 
-... a little later that same day...
+### A little later that same day...
 
 The more I dug into the integration tests the more I realized that I want to overhaul them myself.
 The main problem is that the `pgosm-flex` command isn't actually being tested from the top down.
@@ -231,7 +231,7 @@ I want to avoid it to have fewer moving parts.
 
 To get rid of it, I now dynamic load the configuration for the lua scripts in an environment variable
 called `PGOSM_LUA_CONFIG`. This does present certain security issues (config values can be coerced into
-executing arbitrary code now), but from now, I'm not worried about it and will make sure to mention this
+executing arbitrary code now), but for now, I'm not worried about it and will make sure to mention this
 later in any audits I do of my own work.
 
 I did think about writing a config file to a temp location and then just loading that, but I think the
@@ -247,10 +247,12 @@ geofabrik files by using the `--region` and `--subregion` options and testing th
 ### Random notes
 
 - Don't think the `layerset` option is working when set from the config file
-- Need to test `pg_dump`
-- Need to test the `osm2pgql-replication` functionality
-- Need to test loading settings from all different configuration sources
-- Need at least one test where I download data from geofabrik
+- Need to test:
+  - `pg_dump`
+  - `osm2pgql-replication`
+  - loading settings from all different configuration sources
+  - Downloading data from geofabrik
 - Not sure if the new drop tables routine works as expected
+- Something is creating `checksum-test.txt` files and I need to figure out why
 
 

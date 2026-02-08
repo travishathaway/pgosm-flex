@@ -16,9 +16,9 @@ from tempfile import NamedTemporaryFile
 
 import click
 
-from . import __version__, db, geofabrik, helpers
-from . import osm2pgsql_recommendation as rec
-from .config import get_config, init_config
+from pgosm_flex import __version__, db, geofabrik, helpers
+from pgosm_flex import osm2pgsql_recommendation as rec
+from pgosm_flex.config import get_config, init_config
 
 
 @click.command()
@@ -129,6 +129,12 @@ from .config import get_config, init_config
     help='base path containing files necessary for import. default "/app"',
 )
 @click.option(
+    "--data-dir",
+    default=None,
+    type=click.Path(path_type=Path),
+    help="Directory for downloaded OSM data files. Defaults to platform-specific cache directory.",
+)
+@click.option(
     "--db-host",
     "--pg-host",
     "pg_host",
@@ -188,6 +194,7 @@ def run_pgosm_flex(
     srid,
     update,
     base_path,
+    data_dir,
     skip_verify_checksum,
     pg_host,
     pg_port,
@@ -216,6 +223,7 @@ def run_pgosm_flex(
         "srid": srid,
         "update": update,
         "base_path": base_path,
+        "data_dir": data_dir,
         "skip_verify_checksum": skip_verify_checksum,
         "pg_host": pg_host,
         "pg_port": pg_port,
@@ -229,7 +237,7 @@ def run_pgosm_flex(
         config = init_config(cli_args)
     except ValueError as e:
         logger = logging.getLogger("pgosm-flex")
-        logger.error(f"Configuration error: {e}")
+        logger.exception(f"Configuration error: {e}")
         sys.exit(1)
 
     # Setup paths and logging
@@ -255,12 +263,9 @@ def run_pgosm_flex(
         replication_update = False
 
     # Setting pgosm_date when replication is updating isn't an option
-    if replication_update:
-        if config.region.pgosm_date != helpers.get_today():
-            logger.warning(
-                "Overriding --pgosm-date due to replication update mode, setting to today"
-            )
-            config.region.pgosm_date = helpers.get_today()
+    if replication_update and config.region.pgosm_date != helpers.get_today():
+        logger.warning("Overriding --pgosm-date due to replication update mode, setting to today")
+        config.region.pgosm_date = helpers.get_today()
 
     logger.debug(f"UPDATE setting:  {config.import_mode.update}")
 
@@ -347,8 +352,7 @@ def run_osm2pgsql_standard(input_file, out_path, flex_path, skip_nested, import_
     config = get_config()
 
     if config.region.input_file is None:
-        geofabrik.prepare_data(out_path=out_path, skip_verify_checksum=True)
-        pbf_filename = geofabrik.get_region_filename()
+        pbf_filename = geofabrik.prepare_data(out_path=out_path, skip_verify_checksum=True)
     else:
         pbf_filename = config.region.input_file
 
@@ -409,7 +413,7 @@ def lua_style():
         yield tmp_lua_style
 
 
-def _write_index_config(file_handle, flex_path: Path, layer_name: str):
+def _write_index_config(file_handle, flex_path: Path, layer_name: str) -> None:
     """Helper to write index configuration for a layer to Lua format.
 
     Parameters
@@ -569,17 +573,18 @@ def validate_region_inputs(region, subregion, input_file):
     input_file : str
     """
     if region is None and input_file is None:
-        raise ValueError("Either --region or --input-file must be provided")
+        msg = "Either --region or --input-file must be provided"
+        raise ValueError(msg)
 
     if region is None and subregion is not None:
-        raise ValueError("Cannot use --subregion without --region")
+        msg = "Cannot use --subregion without --region"
+        raise ValueError(msg)
 
-    if region is not None:
-        if "/" in region and subregion is None:
-            err_msg = "Region provided appears to include subregion. "
-            err_msg += 'The portion after the final "/" in the Geofabrik URL '
-            err_msg += "should be the --subregion."
-            raise ValueError(err_msg)
+    if region is not None and "/" in region and subregion is None:
+        err_msg = "Region provided appears to include subregion. "
+        err_msg += 'The portion after the final "/" in the Geofabrik URL '
+        err_msg += "should be the --subregion."
+        raise ValueError(err_msg)
 
 
 def setup_logger(debug):
@@ -590,10 +595,7 @@ def setup_logger(debug):
     debug : bool
         Enables debug mode when True.  INFO when False.
     """
-    if debug:
-        log_level = logging.DEBUG
-    else:
-        log_level = logging.INFO
+    log_level = logging.DEBUG if debug else logging.INFO
 
     log_format = "%(asctime)s:%(levelname)s:%(name)s:%(module)s:%(message)s"
     logging.basicConfig(stream=sys.stdout, level=log_level, filemode="w", format=log_format)
@@ -609,17 +611,24 @@ def get_paths():
 
     Ensures `out_path` exists.
 
-    TODO: This should be ported to the ``config`` module.
-
     Returns
     -------
     paths : dict
     """
+    from platformdirs import user_cache_dir
+
+    config = get_config()
     base_path = Path(str(resources.files("pgosm_flex")))
 
     flex_path = base_path / "flex-config"
     db_path = base_path / "db"
-    out_path = base_path / "output"
+
+    # Use data_dir from config, or platformdirs cache
+    if config.processing.data_dir is not None:
+        out_path = config.processing.data_dir
+    else:
+        cache_dir = user_cache_dir("pgosm-flex", "pgosm")
+        out_path = Path(cache_dir)
 
     paths = {
         "base_path": base_path,
@@ -765,10 +774,7 @@ def layerset_include_place(flex_path: str) -> bool:
         # Comes through as str, convert to bool
         include_place = style_config["layerset"]["place"]
         logger.debug(f"Include place?  {include_place}")
-        if include_place.lower() == "true":
-            place = True
-        else:
-            place = False
+        place = include_place.lower() == "true"
         logger.debug(f"Include place?  {place}")
     except KeyError:
         logger.debug("Place layer not defined, setting skip_nested")
@@ -821,9 +827,7 @@ def run_post_processing(flex_path, skip_nested: bool) -> bool:
         logger.info("Calculating nested polygons")
         db.pgosm_nested_admin_polygons(flex_path, config.processing.schema_name)
 
-    if not post_processing_sql:
-        return False
-    return True
+    return post_processing_sql
 
 
 def dump_database(input_file, out_path, pg_dump, skip_qgis_style):
@@ -870,7 +874,7 @@ def check_replication_exists():
     return True
 
 
-def run_osm2pgsql_replication_init(pbf_path: str, pbf_filename: str):
+def run_osm2pgsql_replication_init(pbf_path: str, pbf_filename: str) -> None:
     """Runs osm2pgsql-replication init to support replication mode.
 
     Parameters

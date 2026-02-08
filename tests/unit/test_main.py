@@ -3,11 +3,11 @@
 import io
 import os
 import subprocess
-import pytest
 from pathlib import Path
 
-from pgosm_flex import main as pgosm_flex, config
-
+import pytest
+from pgosm_flex import config
+from pgosm_flex import main as pgosm_flex
 
 REGION_US = "north-america/us"
 SUBREGION_DC = "district-of-columbia"
@@ -18,7 +18,7 @@ PGOSM_DATE = "2021-12-02"
 @pytest.fixture
 def default_config():
     """Default configuration for tests."""
-    yield config.config_context(
+    return config.config_context(
         config.init_config(
             {
                 "region": REGION_US,
@@ -39,7 +39,7 @@ def default_config():
 @pytest.fixture
 def config_region_only():
     """Configuration with region only (no subregion)."""
-    yield config.config_context(
+    return config.config_context(
         config.init_config(
             {
                 "region": "north-america",
@@ -80,6 +80,7 @@ def config_custom_layerset():
                 }
             )
         )
+
     return _config
 
 
@@ -110,9 +111,7 @@ def test_validate_region_inputs_raises_ValueError_subregion_wout_region(default_
             pgosm_flex.validate_region_inputs(region, subregion, input_file)
 
 
-def test_validate_region_inputs_raises_ValueError_region_should_have_subregion(
-    default_config,
-):
+def test_validate_region_inputs_raises_ValueError_region_should_have_subregion(default_config):
     with default_config:
         region = "north-america/us"
         subregion = None
@@ -132,7 +131,7 @@ def test_get_export_full_path_returns_expected_str(default_config):
 
 
 def test_get_export_filename_slash_to_dash(default_config):
-    """Ensure region & subregion have slash "/" changed to dash "-"
+    """Ensure region & subregion have slash "/" changed to dash "-".
 
     Also tests the filename w/ region & subregion - no need for an additional
     test covering that behavior.
@@ -144,9 +143,7 @@ def test_get_export_filename_slash_to_dash(default_config):
         assert expected == result
 
 
-def test_get_export_filename_input_file_defined_overrides_region_subregion(
-    default_config,
-):
+def test_get_export_filename_input_file_defined_overrides_region_subregion(default_config):
     with default_config:
         input_file = "/my/inputfile.osm.pbf"
         result = pgosm_flex.get_export_filename(input_file)
@@ -155,7 +152,7 @@ def test_get_export_filename_input_file_defined_overrides_region_subregion(
 
 
 def test_get_export_filename_region_only(config_region_only):
-    """Override Subregion to None"""
+    """Override Subregion to None."""
     with config_region_only:
         input_file = None
         result = pgosm_flex.get_export_filename(input_file)
@@ -180,9 +177,7 @@ def test_layerset_include_place_returns_True_with_default_layerset(config_region
         assert expected == actual
 
 
-def test_layerset_include_place_returns_false_when_place_false_in_ini(
-    config_custom_layerset,
-):
+def test_layerset_include_place_returns_false_when_place_false_in_ini(config_custom_layerset):
     with config_custom_layerset("place_false"):
         paths = pgosm_flex.get_paths()
         actual = pgosm_flex.layerset_include_place(flex_path=paths["flex_path"])
@@ -190,9 +185,7 @@ def test_layerset_include_place_returns_false_when_place_false_in_ini(
         assert expected == actual
 
 
-def test_layerset_include_place_returns_false_when_place_missing_in_ini(
-    config_custom_layerset,
-):
+def test_layerset_include_place_returns_false_when_place_missing_in_ini(config_custom_layerset):
     with config_custom_layerset("place_missing"):
         paths = pgosm_flex.get_paths()
         actual = pgosm_flex.layerset_include_place(flex_path=paths["flex_path"])
@@ -200,9 +193,7 @@ def test_layerset_include_place_returns_false_when_place_missing_in_ini(
         assert expected == actual
 
 
-def test_layerset_include_place_returns_true_when_place_true_in_ini(
-    config_custom_layerset,
-):
+def test_layerset_include_place_returns_true_when_place_true_in_ini(config_custom_layerset):
     with config_custom_layerset("place_true"):
         paths = pgosm_flex.get_paths()
         actual = pgosm_flex.layerset_include_place(flex_path=paths["flex_path"])
@@ -403,82 +394,72 @@ def test_generate_lua_config_sets_environment_variable(default_config):
 
 def test_generate_lua_config_contains_core_values(default_config):
     """Test that generated config contains all core configuration values."""
-    with default_config:
-        with pgosm_flex.generate_lua_config():
-            lua_config = os.environ["PGOSM_LUA_CONFIG"]
+    with default_config, pgosm_flex.generate_lua_config():
+        lua_config = os.environ["PGOSM_LUA_CONFIG"]
 
-            # Check for core config values
-            assert "srid = 3857" in lua_config
-            assert "schema_name = 'osm'" in lua_config
-            assert f"pgosm_date = '{PGOSM_DATE}'" in lua_config
-            assert "pgosm_language = " in lua_config
+        # Check for core config values
+        assert "srid = 3857" in lua_config
+        assert "schema_name = 'osm'" in lua_config
+        assert f"pgosm_date = '{PGOSM_DATE}'" in lua_config
+        assert "pgosm_language = " in lua_config
 
 
 def test_generate_lua_config_contains_layers_section(default_config):
     """Test that generated config contains the layers section."""
-    with default_config:
-        with pgosm_flex.generate_lua_config():
-            lua_config = os.environ["PGOSM_LUA_CONFIG"]
+    with default_config, pgosm_flex.generate_lua_config():
+        lua_config = os.environ["PGOSM_LUA_CONFIG"]
 
-            # Should have layers section
-            assert "layers = {" in lua_config
-            # Should have some layers defined
-            assert "amenity = " in lua_config
-            assert "building = " in lua_config
-            assert "poi = " in lua_config
-            # Values should be Lua booleans
-            assert "true" in lua_config or "false" in lua_config
+        # Should have layers section
+        assert "layers = {" in lua_config
+        # Should have some layers defined
+        assert "amenity = " in lua_config
+        assert "building = " in lua_config
+        assert "poi = " in lua_config
+        # Values should be Lua booleans
+        assert "true" in lua_config or "false" in lua_config
 
 
 def test_generate_lua_config_contains_indexes_section(default_config):
     """Test that generated config contains the indexes section."""
-    with default_config:
-        with pgosm_flex.generate_lua_config():
-            lua_config = os.environ["PGOSM_LUA_CONFIG"]
+    with default_config, pgosm_flex.generate_lua_config():
+        lua_config = os.environ["PGOSM_LUA_CONFIG"]
 
-            # Should have indexes section
-            assert "indexes = {" in lua_config
+        # Should have indexes section
+        assert "indexes = {" in lua_config
 
 
 def test_generate_lua_config_returns_valid_lua(default_config):
     """Test that generated config returns a valid Lua table."""
-    with default_config:
-        with pgosm_flex.generate_lua_config():
-            lua_config = os.environ["PGOSM_LUA_CONFIG"]
+    with default_config, pgosm_flex.generate_lua_config():
+        lua_config = os.environ["PGOSM_LUA_CONFIG"]
 
-            # Should start with comment and return config
-            assert lua_config.startswith("-- Auto-generated")
-            assert "return config" in lua_config
+        # Should start with comment and return config
+        assert lua_config.startswith("-- Auto-generated")
+        assert "return config" in lua_config
 
 
 def test_generate_lua_config_valid_lua_syntax(default_config):
     """Test that generated config has valid Lua syntax using luac."""
-    with default_config:
-        with pgosm_flex.generate_lua_config():
-            lua_config = os.environ["PGOSM_LUA_CONFIG"]
+    with default_config, pgosm_flex.generate_lua_config():
+        lua_config = os.environ["PGOSM_LUA_CONFIG"]
 
-            # Try to validate syntax with luac if available
-            try:
-                result = subprocess.run(
-                    ["luac", "-p", "-"],
-                    input=lua_config,
-                    text=True,
-                    capture_output=True,
-                    timeout=5
-                )
-                # If luac is available, check it validates successfully
-                assert result.returncode == 0, f"Lua syntax error: {result.stderr}"
-            except FileNotFoundError:
-                # luac not available, skip this check
-                pytest.skip("luac not available for syntax validation")
+        # Try to validate syntax with luac if available
+        try:
+            result = subprocess.run(
+                ["luac", "-p", "-"], input=lua_config, text=True, capture_output=True, timeout=5
+            )
+            # If luac is available, check it validates successfully
+            assert result.returncode == 0, f"Lua syntax error: {result.stderr}"
+        except FileNotFoundError:
+            # luac not available, skip this check
+            pytest.skip("luac not available for syntax validation")
 
 
 def test_generate_lua_config_can_be_loaded_by_lua(default_config):
     """Test that Lua can actually load and execute the generated config."""
-    with default_config:
-        with pgosm_flex.generate_lua_config():
-            # Create a simple Lua test script that loads the config
-            test_script = '''
+    with default_config, pgosm_flex.generate_lua_config():
+        # Create a simple Lua test script that loads the config
+        test_script = """
 local config_code = os.getenv("PGOSM_LUA_CONFIG")
 if not config_code then
     os.exit(1)
@@ -503,19 +484,19 @@ if not config.layers then os.exit(1) end
 if not config.indexes then os.exit(1) end
 
 os.exit(0)
-            '''
+            """
 
-            try:
-                result = subprocess.run(
-                    ["lua", "-e", test_script],
-                    env=os.environ.copy(),
-                    capture_output=True,
-                    text=True,
-                    timeout=5
-                )
-                assert result.returncode == 0, f"Lua execution failed: {result.stderr}"
-            except FileNotFoundError:
-                pytest.skip("lua interpreter not available for testing")
+        try:
+            result = subprocess.run(
+                ["lua", "-e", test_script],
+                env=os.environ.copy(),
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            assert result.returncode == 0, f"Lua execution failed: {result.stderr}"
+        except FileNotFoundError:
+            pytest.skip("lua interpreter not available for testing")
 
 
 def test_generate_lua_config_with_custom_language(default_config):
@@ -538,10 +519,9 @@ def test_generate_lua_config_with_custom_language(default_config):
         )
     )
 
-    with test_config:
-        with pgosm_flex.generate_lua_config():
-            lua_config = os.environ["PGOSM_LUA_CONFIG"]
-            assert "pgosm_language = 'es'" in lua_config
+    with test_config, pgosm_flex.generate_lua_config():
+        lua_config = os.environ["PGOSM_LUA_CONFIG"]
+        assert "pgosm_language = 'es'" in lua_config
 
 
 def test_generate_lua_config_with_custom_srid(default_config):
@@ -564,10 +544,9 @@ def test_generate_lua_config_with_custom_srid(default_config):
         )
     )
 
-    with test_config:
-        with pgosm_flex.generate_lua_config():
-            lua_config = os.environ["PGOSM_LUA_CONFIG"]
-            assert "srid = 4326" in lua_config
+    with test_config, pgosm_flex.generate_lua_config():
+        lua_config = os.environ["PGOSM_LUA_CONFIG"]
+        assert "srid = 4326" in lua_config
 
 
 def test_generate_lua_config_with_custom_schema(default_config):
@@ -590,10 +569,9 @@ def test_generate_lua_config_with_custom_schema(default_config):
         )
     )
 
-    with test_config:
-        with pgosm_flex.generate_lua_config():
-            lua_config = os.environ["PGOSM_LUA_CONFIG"]
-            assert "schema_name = 'custom_schema'" in lua_config
+    with test_config, pgosm_flex.generate_lua_config():
+        lua_config = os.environ["PGOSM_LUA_CONFIG"]
+        assert "schema_name = 'custom_schema'" in lua_config
 
 
 def test_generate_lua_config_cleanup_on_exception(default_config):
@@ -604,9 +582,76 @@ def test_generate_lua_config_cleanup_on_exception(default_config):
                 # Verify it's set
                 assert "PGOSM_LUA_CONFIG" in os.environ
                 # Simulate an exception
-                raise ValueError("Test exception")
+                msg = "Test exception"
+                raise ValueError(msg)
         except ValueError:
             pass
 
         # Should still be cleaned up after exception
         assert "PGOSM_LUA_CONFIG" not in os.environ
+
+
+# Tests for platformdirs integration
+
+
+def test_get_paths_uses_platformdirs_by_default(default_config, mocker, tmp_path):
+    """Test that out_path uses platformdirs when data_dir is None."""
+    # Use a real temp directory to avoid mkdir issues
+    mock_dir = tmp_path / "mock-cache"
+    mock_cache_dir = mocker.patch("platformdirs.user_cache_dir")
+    mock_cache_dir.return_value = str(mock_dir)
+
+    with default_config:
+        paths = pgosm_flex.get_paths()
+        assert paths["out_path"] == mock_dir
+        mock_cache_dir.assert_called_once_with("pgosm-flex", "pgosm")
+
+
+def test_get_paths_respects_custom_data_dir(mocker, tmp_path):
+    """Test that out_path respects config.processing.data_dir."""
+    custom_dir = tmp_path / "custom-data"
+
+    # Create config with custom data_dir
+    test_config = config.config_context(
+        config.init_config(
+            {
+                "region": REGION_US,
+                "subregion": SUBREGION_DC,
+                "srid": "3857",
+                "language": None,
+                "pgosm_date": PGOSM_DATE,
+                "layerset": LAYERSET,
+                "layerset_path": None,
+                "schema_name": "osm",
+                "skip_nested": True,
+                "ram": 8,
+                "data_dir": custom_dir,
+            }
+        )
+    )
+
+    with test_config:
+        paths = pgosm_flex.get_paths()
+        assert paths["out_path"] == custom_dir
+
+
+def test_data_dir_validates_absolute_path():
+    """Test that data_dir must be an absolute path."""
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError, match="must be an absolute path"):
+        config.init_config(
+            {
+                "region": REGION_US,
+                "subregion": SUBREGION_DC,
+                "srid": "3857",
+                "language": None,
+                "pgosm_date": PGOSM_DATE,
+                "layerset": LAYERSET,
+                "layerset_path": None,
+                "schema_name": "osm",
+                "skip_nested": True,
+                "ram": 8,
+                "data_dir": Path("relative/path"),
+            }
+        )

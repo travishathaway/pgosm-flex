@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import quote
 
+import osmium
 from pydantic import BaseModel, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import SettingsConfigDict
 
@@ -27,7 +28,8 @@ def get_config() -> "PgOSMFlexConfig":
     """Get PgOSM Flex configuration."""
     config = _config_context.get()
     if config is None:
-        raise RuntimeError("Configuration is not initialized")
+        msg = "Configuration is not initialized"
+        raise RuntimeError(msg)
     return config
 
 
@@ -79,7 +81,8 @@ class DatabaseConfig(BaseModel):
     def validate_port(cls, v):
         """Validate port is in valid range."""
         if not 1 <= v <= 65535:
-            raise ValueError("Port must be between 1 and 65535")
+            msg = "Port must be between 1 and 65535"
+            raise ValueError(msg)
         return v
 
     def connection_string(self, admin: bool = False) -> str:
@@ -121,7 +124,7 @@ class RegionConfig(BaseModel):
     region: str | None = None
     subregion: str | None = None
     input_file: Path | None = None
-    pgosm_date: str = Field(default_factory=get_today)
+    pgosm_date: str | None = None
     skip_verify_checksum: bool = False
 
     @field_validator("input_file", mode="before")
@@ -139,16 +142,23 @@ class RegionConfig(BaseModel):
         Mirrors validation from main.validate_region_inputs().
         """
         if self.region is None and self.input_file is None:
-            raise ValueError("Either region or input_file must be provided")
+            msg = "Either region or input_file must be provided"
+            raise ValueError(msg)
 
         if self.region is None and self.subregion is not None:
-            raise ValueError("Cannot use subregion without region")
+            msg = "Cannot use subregion without region"
+            raise ValueError(msg)
 
         if self.region is not None and "/" in self.region and self.subregion is None:
-            raise ValueError(
+            msg = (
                 "Region provided appears to include subregion. "
                 "Use --subregion to specify subregion separately."
             )
+            raise ValueError(msg)
+
+        if self.input_file is not None and not self.input_file.is_file():
+            msg = "Input file does not exist"
+            raise ValueError(msg)
 
         return self
 
@@ -179,6 +189,29 @@ class RegionConfig(BaseModel):
             Input file path as string, or None
         """
         return str(self.input_file) if self.input_file else None
+
+    @model_validator(mode="before")
+    @classmethod
+    def set_pgosm_date(cls, data):
+        """
+        Set pgosm date based on the input_file field or default to today.
+        """
+        if input_file := data.get("input_file"):
+            if os.path.isfile(input_file):
+                try:
+                    reader = osmium.io.Reader(input_file)
+                    header = reader.header()
+                    pgosm_datetime = datetime.datetime.strptime(
+                        header.get("osmosis_replication_timestamp"), "%Y-%m-%dT%H:%M:%SZ"
+                    )
+                    data["pgosm_date"] = pgosm_datetime.strftime("%Y-%m-%d")
+                except RuntimeError as err:
+                    raise ValueError("Error parsing pgosm date file input_file") from err
+
+        elif data.get("pgosm_date") is None:
+            data["pgosm_date"] = get_today()
+
+        return data
 
 
 class LayersetConfig(BaseModel):
@@ -240,10 +273,11 @@ class ImportConfig(BaseModel):
         """
         # Validate mutual exclusivity
         if self.replication and self.update is not None:
-            raise ValueError(
+            msg = (
                 "The --replication and --update features are mutually exclusive. "
                 "Use one or the other."
             )
+            raise ValueError(msg)
 
         # Compute slim_no_drop (from set_slim_no_drop)
         self.slim_no_drop = self.replication or (self.update is not None)
@@ -355,6 +389,7 @@ class ProcessingConfig(BaseModel):
     language: str = "en"
     schema_name: str = "osm"
     base_path: Path | None = Field(default_factory=lambda: Path(str(resources.files("pgosm_flex"))))
+    data_dir: Path | None = None  # Override data directory
     debug: bool = False
 
     @field_validator("ram")
@@ -362,7 +397,8 @@ class ProcessingConfig(BaseModel):
     def validate_ram(cls, v):
         """Validate RAM is positive."""
         if v <= 0:
-            raise ValueError("RAM must be a positive number")
+            msg = "RAM must be a positive number"
+            raise ValueError(msg)
         return v
 
     @field_validator("base_path")
@@ -372,7 +408,19 @@ class ProcessingConfig(BaseModel):
         if v is not None:
             path = Path(v)
             if not path.is_absolute():
-                raise ValueError("base_path must be an absolute path")
+                msg = "base_path must be an absolute path"
+                raise ValueError(msg)
+        return v
+
+    @field_validator("data_dir")
+    @classmethod
+    def validate_data_dir(cls, v):
+        """Validate data_dir is absolute if provided."""
+        if v is not None:
+            path = Path(v)
+            if not path.is_absolute():
+                msg = "data_dir must be an absolute path"
+                raise ValueError(msg)
         return v
 
 
@@ -597,7 +645,7 @@ class ConfigLoader:
             logger.debug("Configuration validated successfully")
             return config
         except Exception as e:
-            logger.error(f"Configuration validation failed: {e}")
+            logger.exception(f"Configuration validation failed: {e}")
             raise
 
     @staticmethod
@@ -647,6 +695,7 @@ class ConfigLoader:
             "language": ("processing", "language"),
             "schema_name": ("processing", "schema_name"),
             "base_path": ("processing", "base_path"),
+            "data_dir": ("processing", "data_dir"),
             "debug": ("processing", "debug"),
         }
 

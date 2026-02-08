@@ -128,8 +128,11 @@ class TestRegionConfig:
 
     def test_region_combined_with_input_file(self):
         """Test region_combined returns input_file path when no region."""
-        config = RegionConfig(input_file=Path("/data/custom.osm.pbf"))
-        assert config.region_combined == "/data/custom.osm.pbf"
+        pbf_file = str(
+            resources.files().joinpath("../../tests/data/district-of-columbia-2021-01-13.osm.pbf")
+        )
+        config = RegionConfig(input_file=Path(pbf_file))
+        assert config.region_combined == pbf_file
 
     def test_validation_fails_without_region_or_input(self):
         """Test validation requires region or input_file."""
@@ -156,8 +159,11 @@ class TestRegionConfig:
 
     def test_input_file_instead_of_region(self):
         """Test using input_file instead of region."""
-        config = RegionConfig(input_file=Path("/data/custom.osm.pbf"))
-        assert config.input_file == Path("/data/custom.osm.pbf")
+        pbf_file = str(
+            resources.files().joinpath("../../tests/data/district-of-columbia-2021-01-13.osm.pbf")
+        )
+        config = RegionConfig(input_file=Path(pbf_file))
+        assert config.input_file == Path(pbf_file)
         assert config.region is None
 
     def test_default_pgosm_date(self):
