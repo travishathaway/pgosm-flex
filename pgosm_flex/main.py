@@ -897,8 +897,3 @@ def run_osm2pgsql_replication_init(pbf_path: str, pbf_filename: str):
         sys.exit(f"{err_msg} - Check the log output for details.")
 
     logger.debug("osm2pgsql-replication init completed.")
-
-
-if __name__ == "__main__":
-    logging.getLogger("pgosm-flex").info("Running PgOSM Flex!")
-    run_pgosm_flex()

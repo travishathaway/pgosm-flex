@@ -238,3 +238,19 @@ I did think about writing a config file to a temp location and then just loading
 same security problems exist, and I would additionally have to handle dynamically loading this from
 within the lua scripts themself.
 
+### Later that day...
+
+I was able to get the simple integration tests to work. The next steps are to add more and more scenarios
+to make sure that everything is covered. The next two scenarios I'll focus on are actually downloading
+geofabrik files by using the `--region` and `--subregion` options and testing the `--pg-dump` option.
+
+### Random notes
+
+- Don't think the `layerset` option is working when set from the config file
+- Need to test `pg_dump`
+- Need to test the `osm2pgql-replication` functionality
+- Need to test loading settings from all different configuration sources
+- Need at least one test where I download data from geofabrik
+- Not sure if the new drop tables routine works as expected
+
+

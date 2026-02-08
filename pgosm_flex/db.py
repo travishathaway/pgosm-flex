@@ -22,67 +22,6 @@ from .config import get_config
 LOGGER = logging.getLogger("pgosm-flex")
 
 
-def pg_conn_parts() -> dict:
-    """Returns dictionary of connection parts based on environment variables
-    if they exist.
-
-    Returns
-    -------
-    pg_details : dict
-    """
-    try:
-        pg_user = os.environ["POSTGRES_USER"]
-    except KeyError:
-        LOGGER.debug("POSTGRES_USER not configured. Defaulting to postgres")
-        pg_user = "postgres"
-
-    try:
-        pg_pass: str | None = os.environ["POSTGRES_PASSWORD"]
-        if pg_pass == "":
-            pg_pass = None
-    except KeyError:
-        LOGGER.debug("POSTGRES_PASSWORD not configured. Should work if ~/.pgpass is configured.")
-        pg_pass = None
-
-    try:
-        pg_host = os.environ["POSTGRES_HOST"]
-    except KeyError:
-        pg_host = "localhost"
-        LOGGER.debug(f"POSTGRES_HOST not configured. Defaulting to {pg_host}")
-
-    try:
-        pg_port = os.environ["POSTGRES_PORT"]
-    except KeyError:
-        pg_port = "5432"
-        LOGGER.debug(f"POSTGRES_HOST not configured. Defaulting to {pg_port}")
-
-    LOGGER.debug(f"PG Host: {pg_host} -- Port: {pg_port}")
-
-    default_db = "pgosm"
-    pg_db = None
-
-    try:
-        pg_db = os.environ["POSTGRES_DB"]
-    except KeyError:
-        LOGGER.debug(f"POSTGRES_DB not set.  Using default {default_db}")
-
-    if pg_db is None:
-        pg_db = default_db
-
-    LOGGER.debug(f"DB Name: {pg_db}")
-    os.environ["POSTGRES_DB"] = pg_db
-
-    pg_details = {
-        "pg_user": pg_user,
-        "pg_pass": pg_pass,
-        "pg_host": pg_host,
-        "pg_port": pg_port,
-        "pg_db": pg_db,
-    }
-
-    return pg_details
-
-
 def wait_for_postgres():
     """Ensures Postgres service is reliably ready for use.
 

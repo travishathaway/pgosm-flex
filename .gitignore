@@ -14,3 +14,9 @@ docs/book/*
 
 # Local PostgreSQL data directory (pixi development)
 .pgdata/
+
+# Claude Code
+.claude/
+
+# Coverage reports
+reports/

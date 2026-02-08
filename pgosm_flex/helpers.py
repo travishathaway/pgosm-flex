@@ -2,7 +2,6 @@
 
 import datetime
 import logging
-import os
 import subprocess
 import sys
 from time import sleep
@@ -101,24 +100,3 @@ def verify_checksum(md5_file: str, path: str):
         sys.exit(err_msg)
 
     logger.debug("md5sum validated")
-
-
-def get_region_combined(region: str, subregion: str | None) -> str:
-    """Returns combined region with optional subregion.
-
-    Parameters
-    ----------
-    region : str
-    subregion : str (or None)
-
-    Returns
-    -------
-    pgosm_region : str
-    """
-    if subregion is None:
-        pgosm_region = region
-    else:
-        os.environ["PGOSM_SUBREGION"] = subregion
-        pgosm_region = f"{region}-{subregion}"
-
-    return pgosm_region

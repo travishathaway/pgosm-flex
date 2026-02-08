@@ -1,6 +1,6 @@
 # PgOSM Flex Configuration File Example
 # See documentation for full details on configuration options
-
+    
 # Database connection settings
 [database]
 host = "localhost"
