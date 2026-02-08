@@ -237,3 +237,4 @@ later in any audits I do of my own work.
 I did think about writing a config file to a temp location and then just loading that, but I think the
 same security problems exist, and I would additionally have to handle dynamically loading this from
 within the lua scripts themself.
+

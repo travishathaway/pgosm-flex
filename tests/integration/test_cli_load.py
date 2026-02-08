@@ -3,20 +3,79 @@ Integration test for pgosm-flex CLI command with table verification.
 
 Tests the complete workflow: CLI invocation -> osm2pgsql processing -> table creation.
 """
+from importlib import resources
+from pathlib import Path
+from typing import Literal
 
 import pytest
 import psycopg
 from click.testing import CliRunner
-from importlib import resources
-from pathlib import Path
-
 from pgosm_flex.main import run_pgosm_flex
+
+from .conftest import DBInfo
+from .cli_load_expected import (
+    LAYERSET_DEFAULT_TABLES,
+    LAYERSET_BASIC_TABLES,
+    LAYERSET_MINIMAL_TABLES,
+    LAYERSET_EVERYTHING_TABLES
+)
+
+#: Available layerset choices
+LayerSet = Literal["default", "basic", "everything", "minimal"]
+
+#: The PBF file we use for our tests
+PBF_FILE = resources.files().joinpath("../../tests/data/district-of-columbia-2021-01-13.osm.pbf")
+
+#: Expected tables to be created when skip-nested = True
+EXPECTED_TABLES_SKIP_NESTED = {
+    "default": LAYERSET_DEFAULT_TABLES,
+    "basic": LAYERSET_BASIC_TABLES,
+    "minimal": LAYERSET_MINIMAL_TABLES,
+    "everything": LAYERSET_EVERYTHING_TABLES,
+}
+
+
+def get_command_args(layerset: LayerSet, test_database: DBInfo, skip_nested: bool = True) -> list[str]:
+    """
+    Get arguments for pgosm-flex CLI command with table verification.
+    """
+    args = [
+        "--ram", "8",  # TODO: we may want to adapt this to test runners
+        "--input-file", PBF_FILE,
+        "--layerset", layerset,
+        "--skip-qgis-style",  # Skip QGIS style import
+        "--subregion", "district-of-columbia",
+        "--region", "north-america",
+        "--db-name", test_database.test_db,
+        "--db-port", test_database.port,
+        "--db-user", test_database.user,
+        "--db-host", test_database.host
+    ]
+
+    if skip_nested:
+        args.append("--skip-nested")
+
+    return args
+
+
+def id_layerset_skip_nested(val):
+    layerset, skip_nested = val
+    skip_str = "skip_nested" if skip_nested else "with_nested"
+
+    return f"{layerset}-{skip_str}"
 
 
 @pytest.mark.integration
 @pytest.mark.slow
 @pytest.mark.timeout(600)  # 10 minute timeout
-def test_cli_load_dc_data(test_database, monkeypatch):
+@pytest.mark.parametrize("layerset_skip_nested", (
+    ("default", True),
+    ("default", False),
+    ("basic", True),
+    ("everything", True),
+    ("minimal", True),
+), ids=id_layerset_skip_nested)
+def test_cli_load_dc_data(test_database: DBInfo, layerset_skip_nested: tuple[LayerSet, bool]):
     """
     Test pgosm-flex CLI loads DC data and creates expected tables.
 
@@ -25,32 +84,15 @@ def test_cli_load_dc_data(test_database, monkeypatch):
     2. Provides the DC PBF file via --input-file
     3. Verifies all expected tables are created in the osm schema
     4. Uses a real PostgreSQL database (via test_database fixture)
-
-    Parameters
-    ----------
-    test_database : str
-        Database connection string from conftest.py fixture
     """
-
     runner = CliRunner()
-    pbf_file = resources.files().joinpath("../../tests/data/district-of-columbia-2021-01-13.osm.pbf")
+    layerset, skip_nested = layerset_skip_nested
 
     # Verify PBF file exists
-    assert Path(pbf_file).exists(), f"PBF file not found: {pbf_file}"
+    assert Path(PBF_FILE).exists(), f"PBF file not found: {PBF_FILE}"
 
-    result = runner.invoke(run_pgosm_flex, [
-        "--ram", "8",
-        "--input-file", pbf_file,
-        "--layerset", "default",
-        "--skip-nested",  # Skip nested polygon calculation for speed
-        "--skip-qgis-style",  # Skip QGIS style import
-        "--subregion", "district-of-columbia",
-        "--region", "north-america",
-        "--db-name", test_database.test_db,
-        "--db-port", test_database.port,
-        "--db-user", test_database.user,
-        "--db-host", test_database.host
-    ])
+    args = get_command_args(layerset, test_database, skip_nested=skip_nested)
+    result = runner.invoke(run_pgosm_flex, args)
 
     # Check CLI execution succeeded
     assert result.exit_code == 0, f"CLI command failed with exit code {result.exit_code}:\n{result.output}"
@@ -75,55 +117,15 @@ def test_cli_load_dc_data(test_database, monkeypatch):
 
             actual_tables = {row[0] for row in cursor.fetchall()}
 
-            # Expected tables from default layerset (46 tables)
-            expected_tables = {
-                # amenity (3)
-                "amenity_point", "amenity_line", "amenity_polygon",
-                # building (2)
-                "building_point", "building_polygon",
-                # indoor (3)
-                "indoor_point", "indoor_line", "indoor_polygon",
-                # infrastructure (3)
-                "infrastructure_point", "infrastructure_line", "infrastructure_polygon",
-                # landuse (2)
-                "landuse_point", "landuse_polygon",
-                # leisure (2)
-                "leisure_point", "leisure_polygon",
-                # natural (3)
-                "natural_point", "natural_line", "natural_polygon",
-                # place (3)
-                "place_point", "place_line", "place_polygon",
-                # poi (3)
-                "poi_point", "poi_line", "poi_polygon",
-                # public_transport (3)
-                "public_transport_point", "public_transport_line", "public_transport_polygon",
-                # road (3)
-                "road_point", "road_line", "road_polygon",
-                # shop (2)
-                "shop_point", "shop_polygon",
-                # tags (1)
-                "tags",
-                # traffic (3)
-                "traffic_point", "traffic_line", "traffic_polygon",
-                # water (3)
-                "water_point", "water_line", "water_polygon",
-            }
+            expected_tables = set(EXPECTED_TABLES_SKIP_NESTED.get(layerset))
 
             # Verify all expected tables exist
             missing_tables = expected_tables - actual_tables
             assert not missing_tables, f"Missing tables: {sorted(missing_tables)}"
 
-            # Check for extra tables (may include metadata tables like pgosm_flex)
-            extra_tables = actual_tables - expected_tables
-            # Note: pgosm_flex creates additional metadata tables, so this is informational
-            if extra_tables:
-                print(f"Note: Extra tables found (may be metadata): {sorted(extra_tables)}")
-
             # Verify we have at least the expected count
             assert len(actual_tables) >= len(expected_tables), \
                 f"Expected at least {len(expected_tables)} tables, found {len(actual_tables)}"
-
-            print(f"✓ Successfully verified {len(expected_tables)} expected tables in osm schema")
 
     finally:
         conn.close()

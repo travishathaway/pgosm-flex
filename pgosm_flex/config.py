@@ -355,7 +355,7 @@ class ProcessingConfig(BaseModel):
 
     ram: float  # Required - amount of RAM in GB
     srid: str = "3857"  # helpers.DEFAULT_SRID
-    language: Optional[str] = None
+    language: str = "en" # Defaults to English
     schema_name: str = "osm"
     base_path: Optional[Path] = resources.files("pgosm_flex")
     debug: bool = False
