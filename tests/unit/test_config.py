@@ -2,21 +2,20 @@
 
 import os
 import re
+import tempfile
 from importlib import resources
 from pathlib import Path
 from unittest.mock import patch
-import tempfile
 
 import pytest
-
 from pgosm_flex.config import (
-    DatabaseConfig,
-    RegionConfig,
-    LayersetConfig,
-    ImportConfig,
-    ProcessingConfig,
-    PgOSMFlexConfig,
     ConfigLoader,
+    DatabaseConfig,
+    ImportConfig,
+    LayersetConfig,
+    PgOSMFlexConfig,
+    ProcessingConfig,
+    RegionConfig,
     get_today,
 )
 
@@ -44,9 +43,7 @@ class TestDatabaseConfig:
 
     def test_custom_values(self):
         """Test custom database configuration."""
-        config = DatabaseConfig(
-            host="dbhost", port=5433, database="mydb", user="myuser"
-        )
+        config = DatabaseConfig(host="dbhost", port=5433, database="mydb", user="myuser")
         assert config.host == "dbhost"
         assert config.port == 5433
         assert config.database == "mydb"
@@ -380,9 +377,9 @@ class TestProcessingConfig:
         assert config.schema_name == "myschema"
 
     def test_language_default(self):
-        """Test language defaults to None."""
+        """Test language defaults to "en"."""
         config = ProcessingConfig(ram=4.0)
-        assert config.language is None
+        assert config.language == "en"
 
     def test_language_custom(self):
         """Test custom language."""
@@ -492,8 +489,7 @@ class TestPgOSMFlexConfig:
     def test_to_env_vars_default_srid(self):
         """Test to_env_vars omits SRID when default."""
         config = PgOSMFlexConfig(
-            region=RegionConfig(region="europe"),
-            processing=ProcessingConfig(ram=4.0, srid="3857"),
+            region=RegionConfig(region="europe"), processing=ProcessingConfig(ram=4.0, srid="3857")
         )
 
         env_vars = config.to_env_vars()
@@ -685,9 +681,7 @@ srid = "3857"
             finally:
                 os.unlink(f.name)
 
-    @patch.dict(
-        os.environ, {"PGOSM_REGION": "africa", "POSTGRES_HOST": "envhost"}, clear=True
-    )
+    @patch.dict(os.environ, {"PGOSM_REGION": "africa", "POSTGRES_HOST": "envhost"}, clear=True)
     def test_load_precedence_toml_over_env(self):
         """Test TOML overrides environment variables."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:

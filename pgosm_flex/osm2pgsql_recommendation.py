@@ -5,8 +5,8 @@ project.
 import logging
 import os
 
-from . import helpers, osm2pgsql_tuner as tuner
-from .config import get_config, ImportConfig
+from . import osm2pgsql_tuner as tuner
+from .config import ImportConfig, get_config
 
 LOGGER = logging.getLogger("pgosm-flex")
 
@@ -21,7 +21,7 @@ def osm2pgsql_recommendation(
     Public API available at https://osm2pgsql-tuner.com
 
     Parameters
-    ----------------------
+    ----------
     ram : float
         Total system RAM available in GB
     pbf_filename : str
@@ -30,7 +30,7 @@ def osm2pgsql_recommendation(
     pgosm_layer_set : str
 
     Returns
-    ----------------------
+    -------
     osm2pgsql_cmd : str
     """
     system_ram_gb = ram
@@ -52,12 +52,12 @@ def get_recommended_script(
     import_mode: ImportConfig,
     pbf_filename: str,
     output_path: str,
-    pgosm_layer_set: str
+    pgosm_layer_set: str,
 ) -> str:
     """Generates recommended osm2pgsql command from osm2pgsql-tuner.
 
     Parameters
-    -------------------------------
+    ----------
     system_ram_gb : float
     osm_pbf_gb : float
     import_mode : helpers.ImportMode
@@ -67,7 +67,7 @@ def get_recommended_script(
     pgosm_layer_set : str
 
     Returns
-    -------------------------------
+    -------
     osm2pgsql_cmd : str
         The osm2pgsql command to run, customized for this run of pgosm flex.
 
@@ -85,7 +85,7 @@ def get_recommended_script(
         slim_no_drop=import_mode.slim_no_drop,
         append_first_run=import_mode.append_first_run,
         ssd=True,
-        pgosm_layer_set=pgosm_layer_set
+        pgosm_layer_set=pgosm_layer_set,
     )
 
     osm2pgsql_cmd = rec.get_osm2pgsql_command(pbf_path=pbf_filename)

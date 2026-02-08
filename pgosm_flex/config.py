@@ -14,16 +14,16 @@ import os
 from contextvars import ContextVar
 from importlib import resources
 from pathlib import Path
-from typing import Optional, Literal
+from typing import Any, Literal
 from urllib.parse import quote
 
-from pydantic import BaseModel, Field, field_validator, model_validator, SecretStr
+from pydantic import BaseModel, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import SettingsConfigDict
 
-_config_context = ContextVar("config", default=None)
+_config_context: ContextVar["PgOSMFlexConfig | None"] = ContextVar("config", default=None)
 
 
-def get_config() -> "PgOSMFlexConfig | None":
+def get_config() -> "PgOSMFlexConfig":
     """Get PgOSM Flex configuration."""
     config = _config_context.get()
     if config is None:
@@ -32,7 +32,7 @@ def get_config() -> "PgOSMFlexConfig | None":
 
 
 def init_config(
-    cli_args: Optional[dict] = None, toml_path: Path = Path("pgosm-flex.toml")
+    cli_args: dict | None = None, toml_path: Path = Path("pgosm-flex.toml")
 ) -> "PgOSMFlexConfig":
     """Initialize configuration in current context."""
     config = ConfigLoader.load(cli_args=cli_args, toml_path=toml_path)
@@ -70,7 +70,7 @@ class DatabaseConfig(BaseModel):
     port: int = 5432
     database: str = "pgosm"
     user: str = "postgres"
-    password: Optional[SecretStr] = None
+    password: SecretStr | None = None
 
     model_config = SettingsConfigDict(env_prefix="POSTGRES_", case_sensitive=False)
 
@@ -111,17 +111,16 @@ class DatabaseConfig(BaseModel):
 
         if self.password is None:
             return f"postgresql://{user}@{host}:{port}/{db_name}{app_str}"
-        else:
-            password = quote(self.password.get_secret_value())
-            return f"postgresql://{user}:{password}@{host}:{port}/{db_name}{app_str}"
+        password = quote(self.password.get_secret_value())
+        return f"postgresql://{user}:{password}@{host}:{port}/{db_name}{app_str}"
 
 
 class RegionConfig(BaseModel):
     """Region and OSM data source configuration."""
 
-    region: Optional[str] = None
-    subregion: Optional[str] = None
-    input_file: Optional[Path] = None
+    region: str | None = None
+    subregion: str | None = None
+    input_file: Path | None = None
     pgosm_date: str = Field(default_factory=get_today)
     skip_verify_checksum: bool = False
 
@@ -165,12 +164,11 @@ class RegionConfig(BaseModel):
             Combined region string (region or region-subregion or input_file)
         """
         if self.subregion is None:
-            return self.region if self.region else str(self.input_file)
-        else:
-            return f"{self.region}-{self.subregion}"
+            return self.region or str(self.input_file)
+        return f"{self.region}-{self.subregion}"
 
     @property
-    def input_file_str(self) -> Optional[str]:
+    def input_file_str(self) -> str | None:
         """Returns input_file as string or None.
 
         Useful for compatibility with code expecting string paths.
@@ -187,7 +185,7 @@ class LayersetConfig(BaseModel):
     """Layerset configuration for OSM data layers."""
 
     layerset: str = "default"
-    layerset_path: Optional[Path] = None
+    layerset_path: Path | None = None
 
     def load_layerset_ini(self, flex_path: Path) -> dict:
         """Load and parse layerset INI file.
@@ -224,7 +222,7 @@ class ImportConfig(BaseModel):
     force: bool = False
     replication: bool = False
     replication_update: bool = False
-    update: Optional[Literal["append", "create"]] = None
+    update: Literal["append", "create"] | None = None
     skip_nested: bool = False
     skip_qgis_style: bool = False
     pg_dump: bool = False
@@ -305,8 +303,7 @@ class ImportConfig(BaseModel):
             msg += f" Use PgOSM Flex version {prior_version} or newer"
             logger.error(msg)
             return False
-        else:
-            logger.info(f"Prior import used PgOSM Flex: {prior_version}")
+        logger.info(f"Prior import used PgOSM Flex: {prior_version}")
 
         # Check replication compatibility
         prior_replication = prior_import["replication"]
@@ -355,9 +352,9 @@ class ProcessingConfig(BaseModel):
 
     ram: float  # Required - amount of RAM in GB
     srid: str = "3857"  # helpers.DEFAULT_SRID
-    language: str = "en" # Defaults to English
+    language: str = "en"
     schema_name: str = "osm"
-    base_path: Optional[Path] = resources.files("pgosm_flex")
+    base_path: Path | None = Field(default_factory=lambda: Path(str(resources.files("pgosm_flex"))))
     debug: bool = False
 
     @field_validator("ram")
@@ -468,9 +465,9 @@ class ConfigLoader:
             return {}
 
         try:
-            import tomllib  # Python 3.11+
+            import tomllib
         except ImportError:
-            import tomli as tomllib  # Fallback for Python 3.10
+            import tomli as tomllib  # type: ignore[no-redef]  # Fallback for Python 3.10
 
         with open(path, "rb") as f:
             return tomllib.load(f)
@@ -486,7 +483,7 @@ class ConfigLoader:
         dict
             Nested configuration dictionary from environment variables
         """
-        config = {
+        config: dict[str, dict[str, Any]] = {
             "database": {},
             "region": {},
             "layerset": {},
@@ -530,9 +527,7 @@ class ConfigLoader:
 
         # Import mode config
         if "SKIP_NESTED" in os.environ:
-            config["import_mode"]["skip_nested"] = (
-                os.environ["SKIP_NESTED"].lower() == "true"
-            )
+            config["import_mode"]["skip_nested"] = os.environ["SKIP_NESTED"].lower() == "true"
 
         return config
 
@@ -550,15 +545,11 @@ class ConfigLoader:
         dict
             Merged configuration dictionary
         """
-        result = {}
+        result: dict[str, Any] = {}
 
         for config in configs:
             for key, value in config.items():
-                if (
-                    isinstance(value, dict)
-                    and key in result
-                    and isinstance(result[key], dict)
-                ):
+                if isinstance(value, dict) and key in result and isinstance(result[key], dict):
                     # Recursively merge nested dicts
                     result[key] = ConfigLoader.merge_configs(result[key], value)
                 else:
@@ -569,7 +560,7 @@ class ConfigLoader:
 
     @classmethod
     def load(
-        cls, cli_args: Optional[dict] = None, toml_path: Path = Path("pgosm-flex.toml")
+        cls, cli_args: dict | None = None, toml_path: Path = Path("pgosm-flex.toml")
     ) -> PgOSMFlexConfig:
         """Load configuration with precedence: CLI > TOML > Env > Defaults.
 
@@ -623,7 +614,7 @@ class ConfigLoader:
         dict
             Nested configuration dictionary
         """
-        config = {
+        config: dict[str, dict[str, Any]] = {
             "database": {},
             "region": {},
             "layerset": {},

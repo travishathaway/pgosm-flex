@@ -3,18 +3,15 @@
 Recommendations are targeted for osm2pgsql v1.5.0 and newer.
 """
 
+#: float : Sets threshold size for when to use ``--flat-nodes``
 FLAT_NODES_THRESHOLD_GB = 8.0
-"""float : Sets threshold size for when to use ``--flat-nodes``.
-
-8-10 GB appears to be an appropriate threshold when using modern SSDs for storage.
-"""
 
 
 class Recommendation:
     """Takes basic inputs to generate command recommendations for osm2pgsql.
 
     Parameters
-    -----------------------
+    ----------
     system_ram_gb : float
         How much total RAM the server has, in GB.
 
@@ -43,7 +40,7 @@ class Recommendation:
         system_ram_gb: float,
         osm_pbf_gb: float,
         slim_no_drop: bool = False,
-        append_first_run: bool = None,
+        append_first_run: bool | None = None,
         pgosm_layer_set: str = "run",
         ssd: bool = True,
     ):
@@ -63,7 +60,7 @@ class Recommendation:
         self.pgosm_layer_set = pgosm_layer_set
         self.ssd = ssd
 
-        self.decisions = []
+        self.decisions: list[dict[str, str]] = []
 
         # Calculated attributes
         self.osm2pgsql_cache_max = self.calculate_max_osm2pgsql_cache()
@@ -81,7 +78,7 @@ class Recommendation:
         """Decide if osm2pgsql can use more RAM than the system has available.
 
         Returns
-        -------------------------
+        -------
         limited_ram : boolean
         """
         if self.osm2pgsql_run_in_ram:
@@ -106,7 +103,7 @@ class Recommendation:
         If the load can run entirely in-memory, no need to use flat nodes.
 
         Returns
-        ---------------------
+        -------
         use_flat_nodes : bool
         """
         if self.osm2pgsql_run_in_ram:
@@ -148,7 +145,7 @@ class Recommendation:
         """Checks other parameters to determine if ``--drop`` should be used.
 
         Returns
-        -----------------------
+        -------
         use_drop : bool
         """
         if self.osm2pgsql_run_in_ram:
@@ -183,8 +180,8 @@ class Recommendation:
 
         Using 2/3 of reported system total.
 
-                Returns
-                -----------------------
+        Returns
+        -------
                 osm2pgsql_cache_max : float
         """
         osm2pgsql_cache_max = self.system_ram_gb * 0.66
@@ -198,7 +195,7 @@ class Recommendation:
         Justification: https://blog.rustprooflabs.com/2021/05/osm2pgsql-reduced-ram-load-to-postgis
 
         Returns
-        --------------------
+        -------
         required_gb : float
             Estimated memory (in GB) osm2pgsql will use if running w/out slim mode.
         """
@@ -212,7 +209,7 @@ class Recommendation:
         PBF to make determination.
 
         Returns
-        --------------------
+        -------
         in_ram_possible : bool
         """
         if self.slim_no_drop:
@@ -233,11 +230,11 @@ class Recommendation:
         """Builds the recommended osm2pgsql command.
 
         Parameters
-        -----------------------
+        ----------
         pbf_path : str
 
         Returns
-        -----------------------
+        -------
         cmd : str
         """
         cmd = "osm2pgsql -d $PGOSM_CONN "
@@ -261,7 +258,7 @@ class Recommendation:
 
         cmd += osm2pgsql_mode
 
-        cmd += f" --output=flex"
+        cmd += " --output=flex"
         cmd += f" --style={self.pgosm_layer_set}"
         cmd += f" {pbf_path}"
 
@@ -273,17 +270,13 @@ class Recommendation:
         osm2pgsql will only use a cache value > 0 while in slim mode.
 
         Returns
-        ----------------------
+        -------
         cache : int
             Size in MB to set --cache
         """
         if self.osm2pgsql_flat_nodes:
             cache = 0
-            decision = {
-                "option": "--cache",
-                "name": "Using --flat-nodes",
-                "desc": "Set --cache 0.",
-            }
+            decision = {"option": "--cache", "name": "Using --flat-nodes", "desc": "Set --cache 0."}
         elif self.osm2pgsql_limited_ram:
             cache = int(self.osm2pgsql_cache_max * 1024)
             decision = {

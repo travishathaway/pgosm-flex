@@ -7,7 +7,6 @@ import subprocess
 from . import db
 from .config import get_config
 
-
 LOGGER = logging.getLogger("pgosm-flex")
 
 
@@ -15,7 +14,7 @@ def load_qgis_styles(db_path, db_name):
     """Loads QGIS style data for easy formatting of most common layers.
 
     Parameters
-    -------------------------
+    ----------
     db_path : str
         Base path to pgosm-flex/db directory
     db_name : str
@@ -34,13 +33,13 @@ def create_layer_style_table(db_path, conn_string):
     """Ensures QGIS layer styles table exists.
 
     Parameters
-    --------------------
+    ----------
     db_path : str
     conn_string : path
     """
     create_path = os.path.join(db_path, "qgis-style", "create_layer_styles.sql")
 
-    with open(create_path, "r") as file_in:
+    with open(create_path) as file_in:
         create_sql = file_in.read()
 
     with db.get_db_conn(conn_string=conn_string) as conn:
@@ -53,7 +52,7 @@ def populate_layer_style_staging(db_path, conn_string):
     """Loads data to public.layer_styles_staging using psql
 
     Parameters
-    --------------------
+    ----------
     db_path : str
     conn_string : path
     """
@@ -61,9 +60,7 @@ def populate_layer_style_staging(db_path, conn_string):
     # psql to reload is easiest
     cmds_populate = ["psql", "-d", conn_string, "-f", "qgis-style/layer_styles.sql"]
 
-    output = subprocess.run(
-        cmds_populate, text=True, capture_output=True, cwd=db_path, check=False
-    )
+    output = subprocess.run(cmds_populate, text=True, capture_output=True, cwd=db_path, check=False)
 
     LOGGER.debug(f"Output from loading QGIS style data: {output.stdout}")
 
@@ -72,13 +69,13 @@ def load_staging_to_prod(db_path, conn_string):
     """Loads data from public.layer_styles_staging to public.layer_styles.
 
     Parameters
-    --------------------
+    ----------
     db_path : str
     conn_string : path
     """
     load_path = os.path.join(db_path, "qgis-style", "_load_layer_styles.sql")
 
-    with open(load_path, "r") as file_in:
+    with open(load_path) as file_in:
         load_sql = file_in.read()
 
     with db.get_db_conn(conn_string=conn_string) as conn:
@@ -98,14 +95,12 @@ def load_staging_to_prod(db_path, conn_string):
 def update_styles_db_name(db_name, conn_string):
     """
     Parameters
-    ----------------------
+    ----------
     db_name : str
     conn_string : str
     """
     if db_name == "pgosm":
-        LOGGER.debug(
-            "Database name set to defaults. Update to layer styles not necessary"
-        )
+        LOGGER.debug("Database name set to defaults. Update to layer styles not necessary")
         return
 
     sql_raw = """

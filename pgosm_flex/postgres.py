@@ -12,7 +12,6 @@ import shutil
 import subprocess
 import time
 from pathlib import Path
-from typing import Optional
 
 
 class Platform:
@@ -31,10 +30,12 @@ class Platform:
         Args:
             cmd: Command name (e.g., 'initdb', 'pg_ctl')
 
-        Returns:
+        Returns
+        -------
             Full path to command
 
-        Raises:
+        Raises
+        ------
             FileNotFoundError: If command not found in PATH or common locations
         """
         if Platform.is_windows():
@@ -101,7 +102,8 @@ class PgDataManager:
 
         Handles stale PID files by checking if the process actually exists.
 
-        Returns:
+        Returns
+        -------
             True if PostgreSQL is running, False otherwise
         """
         if not self.postmaster_pid.exists():
@@ -113,22 +115,18 @@ class PgDataManager:
             if not pid_text:
                 return False
 
-            pid = int(pid_text.split('\n')[0])
+            pid = int(pid_text.split("\n")[0])
 
             # Check if process exists (cross-platform)
             if Platform.is_windows():
                 # Windows: use tasklist command
                 result = subprocess.run(
-                    ["tasklist", "/FI", f"PID eq {pid}"],
-                    capture_output=True,
-                    text=True,
-                    timeout=5
+                    ["tasklist", "/FI", f"PID eq {pid}"], capture_output=True, text=True, timeout=5
                 )
                 return str(pid) in result.stdout
-            else:
-                # Unix: send signal 0 (doesn't kill, just checks existence)
-                os.kill(pid, 0)
-                return True
+            # Unix: send signal 0 (doesn't kill, just checks existence)
+            os.kill(pid, 0)
+            return True
         except (ValueError, ProcessLookupError, OSError, subprocess.TimeoutExpired):
             # PID file invalid or process doesn't exist - stale file
             return False
@@ -151,11 +149,7 @@ class PostgresManager:
         self.user = user
 
     def _run_command(
-        self,
-        cmd: list[str],
-        capture_output: bool = True,
-        check: bool = True,
-        timeout: int = 30
+        self, cmd: list[str], capture_output: bool = True, check: bool = True, timeout: int = 30
     ) -> subprocess.CompletedProcess:
         """
         Run command with error handling.
@@ -166,19 +160,17 @@ class PostgresManager:
             check: Whether to raise exception on non-zero exit
             timeout: Command timeout in seconds
 
-        Returns:
+        Returns
+        -------
             CompletedProcess instance
 
-        Raises:
+        Raises
+        ------
             RuntimeError: If command fails or times out
         """
         try:
             result = subprocess.run(
-                cmd,
-                capture_output=capture_output,
-                text=True,
-                check=check,
-                timeout=timeout
+                cmd, capture_output=capture_output, text=True, check=check, timeout=timeout
             )
             return result
         except subprocess.TimeoutExpired:
@@ -193,17 +185,20 @@ class PostgresManager:
         """
         Initialize PostgreSQL data directory using initdb.
 
-        Raises:
+        Raises
+        ------
             RuntimeError: If initialization fails
         """
         initdb_cmd = Platform.find_pg_command("initdb")
 
         cmd = [
             initdb_cmd,
-            "-D", str(self.data_mgr.data_dir),
-            "-U", self.user,
+            "-D",
+            str(self.data_mgr.data_dir),
+            "-U",
+            self.user,
             "--no-locale",
-            "--encoding=UTF8"
+            "--encoding=UTF8",
         ]
 
         self._run_command(cmd)
@@ -212,17 +207,21 @@ class PostgresManager:
         """
         Start PostgreSQL server using pg_ctl.
 
-        Raises:
+        Raises
+        ------
             RuntimeError: If start fails
         """
         pg_ctl_cmd = Platform.find_pg_command("pg_ctl")
 
         cmd = [
             pg_ctl_cmd,
-            "-D", str(self.data_mgr.data_dir),
-            "-l", str(self.data_mgr.logfile),
-            "-o", f"-p {self.port}",
-            "start"
+            "-D",
+            str(self.data_mgr.data_dir),
+            "-l",
+            str(self.data_mgr.logfile),
+            "-o",
+            f"-p {self.port}",
+            "start",
         ]
 
         self._run_command(cmd)
@@ -231,17 +230,13 @@ class PostgresManager:
         """
         Stop PostgreSQL server gracefully using pg_ctl.
 
-        Raises:
+        Raises
+        ------
             RuntimeError: If stop fails
         """
         pg_ctl_cmd = Platform.find_pg_command("pg_ctl")
 
-        cmd = [
-            pg_ctl_cmd,
-            "-D", str(self.data_mgr.data_dir),
-            "stop",
-            "-m", "fast"
-        ]
+        cmd = [pg_ctl_cmd, "-D", str(self.data_mgr.data_dir), "stop", "-m", "fast"]
 
         self._run_command(cmd, timeout=60)
 
@@ -253,7 +248,8 @@ class PostgresManager:
             timeout: Maximum seconds to wait
             verbose: Whether to print progress messages
 
-        Returns:
+        Returns
+        -------
             True if PostgreSQL became ready, False if timeout
         """
         pg_isready_cmd = Platform.find_pg_command("pg_isready")
@@ -276,7 +272,7 @@ class PostgresManager:
                 result = subprocess.run(
                     [pg_isready_cmd, "-h", "localhost", "-p", str(self.port)],
                     capture_output=True,
-                    timeout=2
+                    timeout=2,
                 )
                 if result.returncode == 0:
                     if verbose:
@@ -298,18 +294,24 @@ class PostgresManager:
         Args:
             dbname: Database name to check
 
-        Returns:
+        Returns
+        -------
             True if database exists, False otherwise
         """
         psql_cmd = Platform.find_pg_command("psql")
 
         cmd = [
             psql_cmd,
-            "-h", "localhost",
-            "-p", str(self.port),
-            "-U", self.user,
-            "-d", "postgres",
-            "-tAc", f"SELECT 1 FROM pg_database WHERE datname='{dbname}'"
+            "-h",
+            "localhost",
+            "-p",
+            str(self.port),
+            "-U",
+            self.user,
+            "-d",
+            "postgres",
+            "-tAc",
+            f"SELECT 1 FROM pg_database WHERE datname='{dbname}'",
         ]
 
         try:
@@ -325,18 +327,24 @@ class PostgresManager:
         Args:
             dbname: Database name to create
 
-        Raises:
+        Raises
+        ------
             RuntimeError: If database creation fails
         """
         psql_cmd = Platform.find_pg_command("psql")
 
         cmd = [
             psql_cmd,
-            "-h", "localhost",
-            "-p", str(self.port),
-            "-U", self.user,
-            "-d", "postgres",
-            "-c", f"CREATE DATABASE {dbname}"
+            "-h",
+            "localhost",
+            "-p",
+            str(self.port),
+            "-U",
+            self.user,
+            "-d",
+            "postgres",
+            "-c",
+            f"CREATE DATABASE {dbname}",
         ]
 
         self._run_command(cmd)
@@ -348,18 +356,24 @@ class PostgresManager:
         Args:
             dbname: Database name to drop
 
-        Raises:
+        Raises
+        ------
             RuntimeError: If database drop fails
         """
         psql_cmd = Platform.find_pg_command("psql")
 
         cmd = [
             psql_cmd,
-            "-h", "localhost",
-            "-p", str(self.port),
-            "-U", self.user,
-            "-d", "postgres",
-            "-c", f"DROP DATABASE IF EXISTS {dbname}"
+            "-h",
+            "localhost",
+            "-p",
+            str(self.port),
+            "-U",
+            self.user,
+            "-d",
+            "postgres",
+            "-c",
+            f"DROP DATABASE IF EXISTS {dbname}",
         ]
 
         self._run_command(cmd)
@@ -371,18 +385,24 @@ class PostgresManager:
         Args:
             dbname: Database name
 
-        Raises:
+        Raises
+        ------
             RuntimeError: If PostGIS extension creation fails
         """
         psql_cmd = Platform.find_pg_command("psql")
 
         cmd = [
             psql_cmd,
-            "-h", "localhost",
-            "-p", str(self.port),
-            "-U", self.user,
-            "-d", dbname,
-            "-c", "CREATE EXTENSION IF NOT EXISTS postgis"
+            "-h",
+            "localhost",
+            "-p",
+            str(self.port),
+            "-U",
+            self.user,
+            "-d",
+            dbname,
+            "-c",
+            "CREATE EXTENSION IF NOT EXISTS postgis",
         ]
 
         self._run_command(cmd)
@@ -405,7 +425,7 @@ class PostgresCluster:
         self.port = port
         self.user = user
 
-    def setup(self, databases: Optional[list[str]] = None, enable_postgis: bool = False) -> None:
+    def setup(self, databases: list[str] | None = None, enable_postgis: bool = False) -> None:
         """
         Initialize, start PostgreSQL, and create databases.
 
@@ -413,7 +433,8 @@ class PostgresCluster:
             databases: List of database names to create (optional)
             enable_postgis: Whether to enable PostGIS extension in created databases
 
-        Raises:
+        Raises
+        ------
             RuntimeError: If setup fails
         """
         # Initialize if needed
@@ -457,7 +478,8 @@ class PostgresCluster:
         Args:
             database: Database name
 
-        Returns:
+        Returns
+        -------
             Connection string in format: postgresql://user@localhost:port/database
         """
         return f"postgresql://{self.user}@localhost:{self.port}/{database}"
@@ -466,7 +488,8 @@ class PostgresCluster:
         """
         Check if PostgreSQL is running.
 
-        Returns:
+        Returns
+        -------
             True if PostgreSQL is running, False otherwise
         """
         return self.data_mgr.is_running()

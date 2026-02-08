@@ -3,24 +3,22 @@ pgosm-flex, an OpenStreetMap data import tool for PostgreSQL/PostGIS.
 
 Documentation available at https://pgosm-flex.com/
 """
+
 import configparser
 import contextlib
+import io
 import logging
 import os
-import io
 import sys
-from pathlib import Path
 from importlib import resources
+from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 import click
 
-from . import __version__
+from . import __version__, db, geofabrik, helpers
 from . import osm2pgsql_recommendation as rec
-from . import db
-from . import geofabrik
-from . import helpers
-from .config import init_config, get_config
+from .config import get_config, init_config
 
 
 @click.command()
@@ -30,13 +28,13 @@ from .config import init_config, get_config
     required=False,
     type=float,
     help="Amount of RAM in GB available on the machine running the Docker container. This is used to determine the "
-         "appropriate osm2pgsql command via osm2pgsql-tuner recommendation engine.",
+    "appropriate osm2pgsql command via osm2pgsql-tuner recommendation engine.",
 )
 @click.option(
     "--region",
     required=False,
     help="Region name matching the filename for data sourced from Geofabrik. e.g. north-america/us. Optional when "
-         "--input-file is specified, otherwise required.",
+    "--input-file is specified, otherwise required.",
 )
 @click.option(
     "--subregion",
@@ -49,14 +47,14 @@ from .config import init_config, get_config
     "--force",
     is_flag=True,
     help="Danger!  Forces PgOSM Flex to load the data even if this will overwrite pre-existing data. See "
-         "https://pgosm-flex.com/force-load.html for more.",
+    "https://pgosm-flex.com/force-load.html for more.",
 )
 @click.option(
     "--input-file",
     required=False,
     default=None,
     help="Set filename or absolute filepath to input osm.pbf file. Overrides default file handling, archiving, "
-         "and MD5 checksum validation.",
+    "and MD5 checksum validation.",
 )
 @click.option(
     "--layerset",
@@ -64,9 +62,7 @@ from .config import init_config, get_config
     default="default",
     help="Layerset to load. Defines name of included layerset unless --layerset-path is defined.",
 )
-@click.option(
-    "--layerset-path", required=False, help="Custom path to load layerset INI from."
-)
+@click.option("--layerset-path", required=False, help="Custom path to load layerset INI from.")
 @click.option(
     "--language",
     default=None,
@@ -85,7 +81,7 @@ from .config import init_config, get_config
     default=helpers.get_today(),
     envvar="PGOSM_DATE",
     help="Date of the data in YYYY-MM-DD format. If today (default), automatically downloads when files not found "
-         "locally. Set to historic date to load locally archived PBF/MD5 file, will fail if both files do not exist.",
+    "locally. Set to historic date to load locally archived PBF/MD5 file, will fail if both files do not exist.",
 )
 @click.option(
     "--replication",
@@ -94,9 +90,7 @@ from .config import init_config, get_config
     help="Replication mode enables updates via osm2pgsql-replication.",
 )
 @click.option(
-    "--schema-name",
-    default="osm",
-    help="Schema name to load OpenStreetMap data into.  Default osm",
+    "--schema-name", default="osm", help="Schema name to load OpenStreetMap data into.  Default osm"
 )
 @click.option(
     "--skip-nested",
@@ -239,7 +233,7 @@ def run_pgosm_flex(
         sys.exit(1)
 
     # Setup paths and logging
-    paths = get_paths(config.processing.base_path)
+    paths = get_paths()
     setup_logger(config.processing.debug)
     logger = logging.getLogger("pgosm-flex")
     logger.info("PgOSM Flex starting...")
@@ -250,12 +244,8 @@ def run_pgosm_flex(
     if config.import_mode.replication:
         replication_update = check_replication_exists()
         if replication_update and config.import_mode.force:
-            err_msg = (
-                "Using --force is invalid when --replication is running an update."
-            )
-            err_msg += (
-                " See https://pgosm-flex.com/replication.html#resetting-replication"
-            )
+            err_msg = "Using --force is invalid when --replication is running an update."
+            err_msg += " See https://pgosm-flex.com/replication.html#resetting-replication"
             err_msg += " for instructions around this on a development server."
             logger.error(err_msg)
             sys.exit(f"ERROR: {err_msg}")
@@ -292,8 +282,7 @@ def run_pgosm_flex(
     )
 
     import_id = db.start_import(
-        osm2pgsql_version=vers_lines,
-        schema_name=config.processing.schema_name
+        osm2pgsql_version=vers_lines, schema_name=config.processing.schema_name
     )
 
     logger.info(f"Started import id {import_id}")
@@ -311,7 +300,7 @@ def run_pgosm_flex(
             flex_path=paths["flex_path"],
             skip_nested=config.import_mode.skip_nested,
             import_mode=config.import_mode,
-            debug=config.processing.debug
+            debug=config.processing.debug,
         )
 
     if not success:
@@ -336,19 +325,12 @@ def run_pgosm_flex(
     logger.info("PgOSM Flex complete!")
 
 
-def run_osm2pgsql_standard(
-    input_file,
-    out_path,
-    flex_path,
-    skip_nested,
-    import_mode,
-    debug
-):
+def run_osm2pgsql_standard(input_file, out_path, flex_path, skip_nested, import_mode, debug):
     """Runs standard osm2pgsql command and optionally inits for replication
     (osm2pgsql-replication) mode.
 
     Parameters
-    ---------------------------
+    ----------
     input_file : str
     out_path : str
     flex_path : str
@@ -357,7 +339,7 @@ def run_osm2pgsql_standard(
     debug : boolean
 
     Returns
-    ---------------------------
+    -------
     post_processing : boolean
         Indicates overall success/failure of the steps within this function.
     """
@@ -379,7 +361,7 @@ def run_osm2pgsql_standard(
                 pbf_filename=pbf_filename,
                 out_path=out_path,
                 import_mode=config.import_mode,
-                pgosm_layer_set=tmp_lua_style.name
+                pgosm_layer_set=tmp_lua_style.name,
             )
 
             run_osm2pgsql(osm2pgsql_command=osm2pgsql_command, flex_path=flex_path, debug=debug)
@@ -388,9 +370,7 @@ def run_osm2pgsql_standard(
         # Don't expect user to use --skip-nested when place isn't included
         skip_nested = check_layerset_skip_nested_place(flex_path)
 
-    post_processing = run_post_processing(
-        flex_path=flex_path, skip_nested=skip_nested
-    )
+    post_processing = run_post_processing(flex_path=flex_path, skip_nested=skip_nested)
 
     if import_mode.replication:
         run_osm2pgsql_replication_init(pbf_path=out_path, pbf_filename=pbf_filename)
@@ -454,12 +434,12 @@ def _write_index_config(file_handle, flex_path: Path, layer_name: str):
     file_handle.write("{\n")
 
     # Write each geometry type section
-    for section in ['point', 'line', 'polygon', 'all']:
+    for section in ["point", "line", "polygon", "all"]:
         if section in config:
             file_handle.write(f"            {section} = {{\n")
             for key, value in config[section].items():
                 # Convert string boolean to Lua boolean, handle other types
-                if value.lower() in ['true', 'false']:
+                if value.lower() in ["true", "false"]:
                     lua_value = value.lower()
                 else:
                     # Quote string values
@@ -541,12 +521,12 @@ def run_replication_update(skip_nested, flex_path):
     """Runs osm2pgsql-replication between the DB start/finish steps.
 
     Parameters
-    -----------------------
+    ----------
     skip_nested : bool
     flex_path : str
 
     Returns
-    ---------------------
+    -------
     bool
         Indicates success/failure of replication process.
     """
@@ -554,24 +534,23 @@ def run_replication_update(skip_nested, flex_path):
     conn_string = db.connection_string()
 
     # Generate Lua configuration module first
-    with generate_lua_config() as lua_config_path:
-        with lua_style() as tmp_lua_style:
-            update_cmd = f"""
+    with generate_lua_config() as lua_config_path, lua_style() as tmp_lua_style:
+        update_cmd = f"""
     osm2pgsql-replication update -d $PGOSM_CONN \
         -- \
         --output=flex --style={tmp_lua_style.name} \
         --slim
         """
 
-            update_cmd = update_cmd.replace("-d $PGOSM_CONN", f"-d {conn_string}")
-            returncode = helpers.run_command_via_subprocess(
-                cmd=update_cmd.split(), cwd=flex_path, print_to_log=True
-            )
+        update_cmd = update_cmd.replace("-d $PGOSM_CONN", f"-d {conn_string}")
+        returncode = helpers.run_command_via_subprocess(
+            cmd=update_cmd.split(), cwd=flex_path, print_to_log=True
+        )
 
-            if returncode != 0:
-                err_msg = f"Failure. Return code: {returncode}"
-                logger.warning(err_msg)
-                return False
+        if returncode != 0:
+            err_msg = f"Failure. Return code: {returncode}"
+            logger.warning(err_msg)
+            return False
 
     db.osm2pgsql_replication_finish(skip_nested=skip_nested)
     logger.info("osm2pgsql-replication update complete")
@@ -584,7 +563,7 @@ def validate_region_inputs(region, subregion, input_file):
     No return, raises error when invalid.
 
     Parameters
-    -----------------------
+    ----------
     region : str
     subregion : str
     input_file : str
@@ -607,7 +586,7 @@ def setup_logger(debug):
     """Prepares logging.
 
     Parameters
-    ------------------------------
+    ----------
     debug : bool
         Enables debug mode when True.  INFO when False.
     """
@@ -617,9 +596,7 @@ def setup_logger(debug):
         log_level = logging.INFO
 
     log_format = "%(asctime)s:%(levelname)s:%(name)s:%(module)s:%(message)s"
-    logging.basicConfig(
-        stream=sys.stdout, level=log_level, filemode="w", format=log_format
-    )
+    logging.basicConfig(stream=sys.stdout, level=log_level, filemode="w", format=log_format)
 
     # Reduce verbosity of urllib3 logging
     logging.getLogger("urllib3").setLevel(logging.INFO)
@@ -627,7 +604,7 @@ def setup_logger(debug):
     logger.debug("Logger configured")
 
 
-def get_paths(base_path: str | None = None):
+def get_paths():
     """Returns dictionary of various paths used.
 
     Ensures `out_path` exists.
@@ -635,23 +612,24 @@ def get_paths(base_path: str | None = None):
     TODO: This should be ported to the ``config`` module.
 
     Returns
-    -------------------
+    -------
     paths : dict
     """
-    base_path = base_path if base_path else resources.files("pgosm_flex")
+    base_path = Path(str(resources.files("pgosm_flex")))
 
-    flex_path = str(resources.files("pgosm_flex").joinpath("flex-config"))
+    flex_path = base_path / "flex-config"
+    db_path = base_path / "db"
+    out_path = base_path / "output"
 
-    db_path = os.path.join(base_path, "db")
-    out_path = os.path.join(base_path, "output")
     paths = {
-        "base_path": Path(base_path),
-        "db_path": Path(db_path),
-        "out_path": Path(out_path),
-        "flex_path": Path(flex_path),
+        "base_path": base_path,
+        "db_path": db_path,
+        "out_path": out_path,
+        "flex_path": flex_path,
     }
 
-    Path(out_path).mkdir(parents=True, exist_ok=True)
+    out_path.mkdir(parents=True, exist_ok=True)
+
     return paths
 
 
@@ -659,7 +637,7 @@ def get_export_filename(input_file: str | None) -> str:
     """Returns the .sql filename to use for pg_dump."""
     # always set internally, even with --input-file and no --region
     config = get_config()
-    region = config.region.region.replace("/", "-")
+    region = config.region.region.replace("/", "-") if config.region.region else "unknown"
     subregion = config.region.subregion
     layerset = config.layerset.layerset
     pgosm_date = config.region.pgosm_date
@@ -683,12 +661,12 @@ def get_export_full_path(out_path, export_filename):
     """If `export_filename` is an absolute path, `out_path` is not considered.
 
     Parameters
-    -----------------
+    ----------
     out_path : str
     export_filename : str
 
     Returns
-    -----------------
+    -------
     export_path : str
     """
     if os.path.isabs(export_filename):
@@ -703,7 +681,7 @@ def run_osm2pgsql(osm2pgsql_command, flex_path, debug):
     """Runs the provided osm2pgsql command.
 
     Parameters
-    ----------------------
+    ----------
     osm2pgsql_command : str
     flex_path : str
     debug : boolean
@@ -727,13 +705,13 @@ def check_layerset_skip_nested_place(flex_path: str) -> bool:
     """If `place` layer is not included `skip_nested` should be true.
 
     Parameters
-    ------------------------
+    ----------
     flex_path : str
         Path to the .ini file for the defined layerset defining which layers
         to include.
 
     Returns
-    ------------------------
+    -------
     skip_nested : boolean
         Return True to disable nested place polygon (post-import processing)
     """
@@ -757,11 +735,11 @@ def check_layerset_skip_nested_place(flex_path: str) -> bool:
 def layerset_include_place(flex_path: str) -> bool:
     """
     Parameters
-    ---------------------
+    ----------
     flex_path : str
 
     Returns
-    ---------------------
+    -------
     place : bool
         If true, the Place layer will be included and post-processing functions
         should be called.
@@ -773,10 +751,12 @@ def layerset_include_place(flex_path: str) -> bool:
     layerset_path = config.layerset.layerset_path
 
     if layerset_path is None:
-        layerset_path = os.path.join(flex_path, "layerset")
-        logger.info(f"Using default layerset path {layerset_path}")
+        layerset_path_str = os.path.join(flex_path, "layerset")
+        logger.info(f"Using default layerset path {layerset_path_str}")
+    else:
+        layerset_path_str = str(layerset_path)
 
-    ini_file = os.path.join(layerset_path, f"{layerset}.ini")
+    ini_file = os.path.join(layerset_path_str, f"{layerset}.ini")
     style_config = configparser.ConfigParser()
     style_config.read(ini_file)
 
@@ -803,12 +783,12 @@ def run_post_processing(flex_path, skip_nested: bool) -> bool:
     Post-processing SQL scripts and (optionally) calculate nested admin polygons
 
     Parameters
-    ----------------------
+    ----------
     flex_path : str
     skip_nested : bool
 
     Returns
-    ----------------------
+    -------
     status : bool
     """
     from pathlib import Path
@@ -850,7 +830,7 @@ def dump_database(input_file, out_path, pg_dump, skip_qgis_style):
     """Runs pg_dump when necessary to export the processed OpenStreetMap data.
 
     Parameters
-    -----------------------
+    ----------
     input_file : str
     out_path : str
     pg_dump : bool
@@ -869,14 +849,14 @@ def check_replication_exists():
     """Checks if replication already setup, if so should only run update.
 
     Returns
-    -------------------
+    -------
     status : bool
     """
     logger = logging.getLogger("pgosm-flex")
     check_cmd = "osm2pgsql-replication status -d $PGOSM_CONN "
     logger.debug(f"Command to check DB for replication status:\n{check_cmd}")
     config = get_config()
-    conn_string = config.db.connection_string()
+    conn_string = config.database.connection_string()
     check_cmd = check_cmd.replace("-d $PGOSM_CONN", f"-d {conn_string}")
 
     returncode = helpers.run_command_via_subprocess(cmd=check_cmd.split(), cwd=None)
@@ -894,7 +874,7 @@ def run_osm2pgsql_replication_init(pbf_path: str, pbf_filename: str):
     """Runs osm2pgsql-replication init to support replication mode.
 
     Parameters
-    ---------------------
+    ----------
     pbf_path : str
     pbf_filename : str
     """
@@ -904,7 +884,7 @@ def run_osm2pgsql_replication_init(pbf_path: str, pbf_filename: str):
     init_cmd += f"--osm-file {pbf_path}"
     logger.debug(f"Initializing DB for replication with command:\n{init_cmd}")
     config = get_config()
-    conn_string = config.db.connection_string()
+    conn_string = config.database.connection_string()
     init_cmd = init_cmd.replace("-d $PGOSM_CONN", f"-d {conn_string}")
 
     returncode = helpers.run_command_via_subprocess(
