@@ -1,9 +1,8 @@
 """Unit tests to cover the osm2pgsql_recommendation module."""
 
 import pytest
-from pgosm_flex import osm2pgsql_recommendation, config
+from pgosm_flex import config, osm2pgsql_recommendation
 from pgosm_flex.config import ImportConfig
-
 
 REGION_US = "north-america/us"
 SUBREGION_DC = "district-of-columbia"
@@ -14,7 +13,7 @@ PGOSM_DATE = "2021-12-02"
 @pytest.fixture
 def default_config():
     """Default configuration for tests."""
-    yield config.config_context(
+    return config.config_context(
         config.init_config(
             {
                 "region": REGION_US,
@@ -37,9 +36,7 @@ def test_get_recommended_script_returns_type_str(default_config):
         expected = str
         system_ram_gb = 2
         osm_pbf_gb = 10
-        im = ImportConfig(
-            replication=False, replication_update=False, update=None, force=False
-        )
+        im = ImportConfig(replication=False, replication_update=False, update=None, force=False)
         pbf_filename = "This-is-a-test.osm.pbf"
         output_path = "this-is-a-test"
         pgosm_layer_set = "/tmp/test_style.lua"
@@ -62,9 +59,7 @@ def test_get_recommended_script_returns_expected_value_simple_example(default_co
         expected = f"osm2pgsql -d postgresql://postgres@localhost:5432/pgosm?application_name=pgosm-flex  --cache=0  --slim  --drop  --flat-nodes=/tmp/nodes  --create  --output=flex --style={pgosm_layer_set} This-is-a-test.osm.pbf"
         system_ram_gb = 2
         osm_pbf_gb = 10
-        im = ImportConfig(
-            replication=False, replication_update=False, update=None, force=False
-        )
+        im = ImportConfig(replication=False, replication_update=False, update=None, force=False)
         pbf_filename = "This-is-a-test.osm.pbf"
         output_path = "this-is-a-test"
         actual = osm2pgsql_recommendation.get_recommended_script(
@@ -84,9 +79,7 @@ def test_get_recommended_script_returns_expected_value_update_create(default_con
         expected = f"osm2pgsql -d postgresql://postgres@localhost:5432/pgosm?application_name=pgosm-flex  --cache=0  --slim  --flat-nodes=/tmp/nodes  --create  --output=flex --style={pgosm_layer_set} This-is-a-test.osm.pbf"
         system_ram_gb = 2
         osm_pbf_gb = 10
-        im = ImportConfig(
-            replication=False, replication_update=False, update="create", force=False
-        )
+        im = ImportConfig(replication=False, replication_update=False, update="create", force=False)
         pbf_filename = "This-is-a-test.osm.pbf"
         output_path = "this-is-a-test"
         actual = osm2pgsql_recommendation.get_recommended_script(
@@ -106,9 +99,7 @@ def test_get_recommended_script_returns_expected_value_update_append(default_con
         expected = f"osm2pgsql -d postgresql://postgres@localhost:5432/pgosm?application_name=pgosm-flex  --cache=0  --slim  --flat-nodes=/tmp/nodes  --append  --output=flex --style={pgosm_layer_set} This-is-a-test.osm.pbf"
         system_ram_gb = 2
         osm_pbf_gb = 10
-        im = ImportConfig(
-            replication=False, replication_update=False, update="append", force=False
-        )
+        im = ImportConfig(replication=False, replication_update=False, update="append", force=False)
         pbf_filename = "This-is-a-test.osm.pbf"
         output_path = "this-is-a-test"
         actual = osm2pgsql_recommendation.get_recommended_script(
@@ -133,9 +124,7 @@ def test_get_recommended_script_returns_expected_value_replication_first(default
         expected = f"osm2pgsql -d postgresql://postgres@localhost:5432/pgosm?application_name=pgosm-flex  --cache=0  --slim  --flat-nodes=/tmp/nodes  --create  --output=flex --style={pgosm_layer_set} This-is-a-test.osm.pbf"
         system_ram_gb = 2
         osm_pbf_gb = 10
-        im = ImportConfig(
-            replication=True, replication_update=False, update=None, force=False
-        )
+        im = ImportConfig(replication=True, replication_update=False, update=None, force=False)
         pbf_filename = "This-is-a-test.osm.pbf"
         output_path = "this-is-a-test"
         actual = osm2pgsql_recommendation.get_recommended_script(

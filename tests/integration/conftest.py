@@ -1,12 +1,11 @@
 """Shared fixtures for integration tests."""
+
+from pathlib import Path
 from typing import NamedTuple
 
-import pytest
 import psycopg
-from pathlib import Path
-
+import pytest
 from pgosm_flex.postgres import PostgresCluster
-
 
 # Test PostgreSQL configuration
 TEST_PG_PORT = 65431  # Separate from dev server (65432)
@@ -14,9 +13,85 @@ TEST_PG_USER = "postgres"
 TEST_DB_MAIN = "pgosm"
 TEST_DB_TESTS = "pgosm_tests"
 
+#: Tables expected to be created with layerset = "default"
+LAYERSET_DEFAULT_TABLES = [
+    "amenity_line",
+    "amenity_point",
+    "amenity_polygon",
+    "building_point",
+    "building_polygon",
+    "indoor_line",
+    "indoor_point",
+    "indoor_polygon",
+    "infrastructure_line",
+    "infrastructure_point",
+    "infrastructure_polygon",
+    "landuse_point",
+    "landuse_polygon",
+    "leisure_point",
+    "leisure_polygon",
+    "natural_line",
+    "natural_point",
+    "natural_polygon",
+    "pgosm_flex",
+    "place_line",
+    "place_point",
+    "place_polygon",
+    # "place_polygon_nested",  # Only created when --skip-nested is False
+    "poi_line",
+    "poi_point",
+    "poi_polygon",
+    "public_transport_line",
+    "public_transport_point",
+    "public_transport_polygon",
+    "road_line",
+    "road_point",
+    "road_polygon",
+    "shop_point",
+    "shop_polygon",
+    "tags",
+    "traffic_line",
+    "traffic_point",
+    "traffic_polygon",
+    "water_line",
+    "water_point",
+    "water_polygon",
+]
+
+#: Tables expected to be created with layerset = "basic"
+LAYERSET_BASIC_TABLES = [
+    "building_combined_point",
+    "landuse_point",
+    "landuse_polygon",
+    "pgosm_flex",
+    "place_line",
+    "place_point",
+    "place_polygon",
+    "poi_combined_point",
+    "road_major",
+    "unitable",
+]
+
+#: Tables expected to be created with layerset = "minimal"
+LAYERSET_MINIMAL_TABLES = [
+    "pgosm_flex",
+    "place_line",
+    "place_point",
+    "place_polygon",
+    "poi_combined_point",
+    "road_major",
+]
+
+LAYERSET_EVERYTHING_TABLES = LAYERSET_DEFAULT_TABLES + [
+    "building_combined_point",
+    "poi_combined_point",
+    "shop_combined_point",
+    "unitable",
+]
+
 
 class DBInfo(NamedTuple):
-    port: int
+    port: str
     user: str
     host: str
     main_db: str
@@ -30,7 +105,8 @@ def postgres_server(tmp_path_factory):
     Creates a temporary PostgreSQL instance on port 65431 (separate from dev server).
     Initializes the cluster, starts the server, creates the pgosm database with PostGIS.
 
-    Yields:
+    Yields
+    ------
         PostgresCluster: Cluster object for use by other fixtures
 
     Cleanup:
@@ -84,7 +160,8 @@ def test_database(postgres_server):
     Drops and recreates the pgosm_tests database before each test to ensure
     a clean state. Enables PostGIS extension and creates osm schema.
 
-    Yields:
+    Yields
+    ------
         str: Connection string for test database
 
     Cleanup:
@@ -150,7 +227,7 @@ def execute_sql_file(conn, sql_file_path):
     str
         Query results in pipe-delimited format (matching psql -tA output)
     """
-    with open(sql_file_path, "r") as f:
+    with open(sql_file_path) as f:
         sql = f.read()
 
     with conn.cursor() as cur:
@@ -187,7 +264,7 @@ def read_expected_output(expected_file_path):
     if not expected_file_path.exists():
         return ""
 
-    with open(expected_file_path, "r") as f:
+    with open(expected_file_path) as f:
         content = f.read()
 
     # Strip trailing whitespace and newline to match actual output

@@ -1,9 +1,7 @@
 """Unit tests to cover the Geofabrik module."""
 
 import pytest
-import unittest
-
-from pgosm_flex import geofabrik, helpers, config
+from pgosm_flex import config, geofabrik
 
 REGION_US = "north-america/us"
 SUBREGION_DC = "district-of-columbia"
@@ -16,18 +14,22 @@ MD5_FILE_WITH_DATE = f"/app/tests/data/district-of-columbia-{PGOSM_DATE}.osm.pbf
 
 @pytest.fixture
 def default_config():
-    yield config.config_context(config.init_config({
-        "region": REGION_US,
-        "subregion": SUBREGION_DC,
-        "srid": "3857",
-        "language": None,
-        "pgosm_date": PGOSM_DATE,
-        "layerset": LAYERSET,
-        "layerset_path": None,
-        "schema_name": "osm",
-        "skip_nested": True,
-        "ram": 8
-    }))
+    return config.config_context(
+        config.init_config(
+            {
+                "region": REGION_US,
+                "subregion": SUBREGION_DC,
+                "srid": "3857",
+                "language": None,
+                "pgosm_date": PGOSM_DATE,
+                "layerset": LAYERSET,
+                "layerset_path": None,
+                "schema_name": "osm",
+                "skip_nested": True,
+                "ram": 8,
+            }
+        )
+    )
 
 
 def test_get_region_filename_returns_subregion_when_exists(default_config):

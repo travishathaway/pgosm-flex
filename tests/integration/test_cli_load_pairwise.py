@@ -21,12 +21,12 @@ import pytest
 from click.testing import CliRunner
 from pgosm_flex.main import run_pgosm_flex
 
-from .cli_load_expected import (
+from .conftest import (
     LAYERSET_BASIC_TABLES,
     LAYERSET_DEFAULT_TABLES,
     LAYERSET_MINIMAL_TABLES,
+    DBInfo,
 )
-from .conftest import DBInfo
 
 #: Available layerset choices
 LayerSet = Literal["default", "basic", "minimal"]
@@ -94,7 +94,7 @@ def get_command_args(
     -------
         List of CLI arguments ready for click.testing.CliRunner
     """
-    args = [
+    args: list[str] = [
         "--ram",
         "8",
         "--layerset",
@@ -274,7 +274,7 @@ def test_pairwise_configurations(test_database: DBInfo, temp_work_dir: Path, con
 
     # Verify local PBF file exists if using file data source
     if config["data_source"] == "file":
-        assert Path(PBF_FILE).exists(), f"PBF file not found: {PBF_FILE}"
+        assert Path(str(PBF_FILE)).exists(), f"PBF file not found: {PBF_FILE}"
 
     # Build CLI arguments
     args = get_command_args(
@@ -340,7 +340,7 @@ def test_data_source_file_minimal(test_database: DBInfo, temp_work_dir: Path) ->
     runner = CliRunner()
 
     # Verify PBF file exists
-    assert Path(PBF_FILE).exists(), f"PBF file not found: {PBF_FILE}"
+    assert Path(str(PBF_FILE)).exists(), f"PBF file not found: {PBF_FILE}"
 
     args = get_command_args(
         layerset="minimal",

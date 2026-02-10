@@ -3,35 +3,22 @@
 from urllib import parse
 
 import pytest
+from pgosm_flex import config, db
 from pydantic.types import SecretStr
-
-from pgosm_flex import db, config
 
 POSTGRES_USER = "my_pg_user"
 POSTGRES_PASSWORD = "here_for_fun!@#$%^&*()"
 POSTGRES_HOST_EXTERNAL = "not-intented-to-be-real"
 
-BASE_CONFIG = {
-    "region": "europe",
-    "subregion": "germany/bremen",
-    "ram": 8
-}
+BASE_CONFIG = {"region": "europe", "subregion": "germany/bremen", "ram": 8}
 
-PG_USER_ONLY = {
-    "pg_user": POSTGRES_USER,
-    "pg_password": "",
-    **BASE_CONFIG
-}
-PG_USER_AND_PW = {
-    "pg_user": POSTGRES_USER,
-    "pg_password": POSTGRES_PASSWORD,
-    **BASE_CONFIG
-}
+PG_USER_ONLY = {"pg_user": POSTGRES_USER, "pg_password": "", **BASE_CONFIG}
+PG_USER_AND_PW = {"pg_user": POSTGRES_USER, "pg_password": POSTGRES_PASSWORD, **BASE_CONFIG}
 POSTGRES_HOST_NON_LOCAL = {
     "pg_host": POSTGRES_HOST_EXTERNAL,
     "pg_user": POSTGRES_USER,
     "pg_password": POSTGRES_PASSWORD,
-    **BASE_CONFIG
+    **BASE_CONFIG,
 }
 
 
@@ -41,10 +28,11 @@ def db_fetchone(mocker):
 
     Returns a function that accepts a return_value parameter for fetchone().
     """
+
     def _mock_db_fetchone(return_value):
         mock_config = mocker.Mock()
         mock_config.database.connection_string.return_value = "postgresql://test@localhost/pgosm"
-        mocker.patch('pgosm_flex.db.get_config', return_value=mock_config)
+        mocker.patch("pgosm_flex.db.get_config", return_value=mock_config)
 
         # Mock the database connection and cursor
         mock_cursor = mocker.Mock()
@@ -55,7 +43,7 @@ def db_fetchone(mocker):
         mock_conn.__enter__ = mocker.Mock(return_value=mock_conn)
         mock_conn.__exit__ = mocker.Mock(return_value=None)
 
-        mocker.patch('pgosm_flex.db.get_db_conn', return_value=mock_conn)
+        mocker.patch("pgosm_flex.db.get_db_conn", return_value=mock_conn)
 
         return mock_cursor
 
@@ -130,7 +118,7 @@ def test_get_prior_import_returns_expected_type(mocker):
     # Mock the config
     mock_config = mocker.Mock()
     mock_config.database.connection_string.return_value = "postgresql://test@localhost/pgosm"
-    mocker.patch('pgosm_flex.db.get_config', return_value=mock_config)
+    mocker.patch("pgosm_flex.db.get_config", return_value=mock_config)
 
     # Mock the database connection and cursor
     # The cursor.execute() returns self, and .fetchone() returns None
@@ -143,7 +131,7 @@ def test_get_prior_import_returns_expected_type(mocker):
     mock_conn.__enter__ = mocker.Mock(return_value=mock_conn)
     mock_conn.__exit__ = mocker.Mock(return_value=None)
 
-    mocker.patch('pgosm_flex.db.get_db_conn', return_value=mock_conn)
+    mocker.patch("pgosm_flex.db.get_db_conn", return_value=mock_conn)
 
     # Call the function
     result = db.get_prior_import(schema_name="osm")
@@ -175,11 +163,11 @@ def test_fix_pg_dump_create_public_replaces_create_schema(tmp_path):
     content = sql_file.read_text()
 
     # Verify the replacement was made
-    assert 'CREATE SCHEMA IF NOT EXISTS public;' in content
-    assert 'CREATE SCHEMA public;' not in content
+    assert "CREATE SCHEMA IF NOT EXISTS public;" in content
+    assert "CREATE SCHEMA public;" not in content
     # Ensure other content is preserved
-    assert 'CREATE EXTENSION IF NOT EXISTS postgis;' in content
-    assert 'CREATE TABLE public.test (id INTEGER);' in content
+    assert "CREATE EXTENSION IF NOT EXISTS postgis;" in content
+    assert "CREATE TABLE public.test (id INTEGER);" in content
 
 
 def test_fix_pg_dump_create_public_handles_multiple_occurrences(tmp_path):
@@ -198,10 +186,10 @@ def test_fix_pg_dump_create_public_handles_multiple_occurrences(tmp_path):
     content = sql_file.read_text()
 
     # Verify both replacements were made
-    assert content.count('CREATE SCHEMA IF NOT EXISTS public;') == 2
-    assert 'CREATE SCHEMA public;' not in content
+    assert content.count("CREATE SCHEMA IF NOT EXISTS public;") == 2
+    assert "CREATE SCHEMA public;" not in content
     # Ensure other schema statements are not affected
-    assert 'CREATE SCHEMA other;' in content
+    assert "CREATE SCHEMA other;" in content
 
 
 def test_fix_pg_dump_create_public_handles_empty_file(tmp_path):

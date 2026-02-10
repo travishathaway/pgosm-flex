@@ -32,11 +32,12 @@ DEFAULT_DB = "pgosm"
 
 class Colors:
     """ANSI color codes (only if terminal supports color)"""
-    GREEN = '\033[92m' if sys.stdout.isatty() else ''
-    RED = '\033[91m' if sys.stdout.isatty() else ''
-    YELLOW = '\033[93m' if sys.stdout.isatty() else ''
-    BLUE = '\033[94m' if sys.stdout.isatty() else ''
-    RESET = '\033[0m' if sys.stdout.isatty() else ''
+
+    GREEN = "\033[92m" if sys.stdout.isatty() else ""
+    RED = "\033[91m" if sys.stdout.isatty() else ""
+    YELLOW = "\033[93m" if sys.stdout.isatty() else ""
+    BLUE = "\033[94m" if sys.stdout.isatty() else ""
+    RESET = "\033[0m" if sys.stdout.isatty() else ""
 
 
 def print_success(msg: str) -> None:
@@ -66,7 +67,8 @@ def cmd_start(args: argparse.Namespace) -> int:
     Args:
         args: Parsed command-line arguments
 
-    Returns:
+    Returns
+    -------
         Exit code (0 for success, non-zero for error)
     """
     data_dir = Path.cwd() / ".pgdata"
@@ -128,7 +130,8 @@ def cmd_stop(args: argparse.Namespace) -> int:
     Args:
         args: Parsed command-line arguments
 
-    Returns:
+    Returns
+    -------
         Exit code (0 for success, non-zero for error)
     """
     data_dir = Path.cwd() / ".pgdata"
@@ -156,7 +159,8 @@ def cmd_destroy(args: argparse.Namespace) -> int:
     Args:
         args: Parsed command-line arguments
 
-    Returns:
+    Returns
+    -------
         Exit code (0 for success, non-zero for error)
     """
     data_dir = Path.cwd() / ".pgdata"
@@ -180,7 +184,7 @@ def cmd_destroy(args: argparse.Namespace) -> int:
     if not args.force:
         print_warning(f"This will permanently delete {cluster.data_mgr.data_dir}")
         response = input("Continue? [y/N]: ").strip().lower()
-        if response not in ('y', 'yes'):
+        if response not in ("y", "yes"):
             print_info("Cancelled")
             return 0
 
@@ -198,7 +202,8 @@ def cmd_status(args: argparse.Namespace) -> int:
     Args:
         args: Parsed command-line arguments
 
-    Returns:
+    Returns
+    -------
         Exit code (0 for success)
     """
     data_dir = Path.cwd() / ".pgdata"
@@ -219,7 +224,7 @@ def cmd_status(args: argparse.Namespace) -> int:
 
     # Read PID from postmaster.pid
     try:
-        pid = cluster.data_mgr.postmaster_pid.read_text().split('\n')[0].strip()
+        pid = cluster.data_mgr.postmaster_pid.read_text().split("\n")[0].strip()
         print(f"PID: {pid}")
     except (OSError, IndexError):
         pass
@@ -240,7 +245,8 @@ def cmd_shell(args: argparse.Namespace) -> int:
     Args:
         args: Parsed command-line arguments
 
-    Returns:
+    Returns
+    -------
         Exit code from psql (0 for success, non-zero for error)
     """
     data_dir = Path.cwd() / ".pgdata"
@@ -267,14 +273,18 @@ def cmd_shell(args: argparse.Namespace) -> int:
         result = subprocess.run(
             [
                 psql_cmd,
-                "-h", "localhost",
-                "-p", str(args.port),
-                "-U", DEFAULT_USER,
-                "-d", DEFAULT_DB
+                "-h",
+                "localhost",
+                "-p",
+                str(args.port),
+                "-U",
+                DEFAULT_USER,
+                "-d",
+                DEFAULT_DB,
             ],
             # Don't capture output - let psql use stdin/stdout/stderr directly
             capture_output=False,
-            text=True
+            text=True,
         )
         return result.returncode
     except KeyboardInterrupt:
@@ -287,7 +297,8 @@ def main() -> int:
     """
     Main entry point.
 
-    Returns:
+    Returns
+    -------
         Exit code (0 for success, non-zero for error)
     """
     parser = argparse.ArgumentParser(
@@ -304,52 +315,30 @@ Examples:
 
 Environment variables:
   PGOSM_PG_PORT    PostgreSQL port (default: 65432)
-        """
+        """,
     )
 
     parser.add_argument(
-        "--port",
-        type=int,
-        default=DEFAULT_PORT,
-        help=f"PostgreSQL port (default: {DEFAULT_PORT})"
+        "--port", type=int, default=DEFAULT_PORT, help=f"PostgreSQL port (default: {DEFAULT_PORT})"
     )
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     # start command
-    subparsers.add_parser(
-        "start",
-        help="Initialize (if needed) and start PostgreSQL"
-    )
+    subparsers.add_parser("start", help="Initialize (if needed) and start PostgreSQL")
 
     # stop command
-    subparsers.add_parser(
-        "stop",
-        help="Stop PostgreSQL gracefully (preserve data)"
-    )
+    subparsers.add_parser("stop", help="Stop PostgreSQL gracefully (preserve data)")
 
     # destroy command
-    destroy_parser = subparsers.add_parser(
-        "destroy",
-        help="Stop PostgreSQL and remove all data"
-    )
-    destroy_parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Skip confirmation prompt"
-    )
+    destroy_parser = subparsers.add_parser("destroy", help="Stop PostgreSQL and remove all data")
+    destroy_parser.add_argument("--force", action="store_true", help="Skip confirmation prompt")
 
     # status command
-    subparsers.add_parser(
-        "status",
-        help="Show PostgreSQL status and connection info"
-    )
+    subparsers.add_parser("status", help="Show PostgreSQL status and connection info")
 
     # shell command
-    subparsers.add_parser(
-        "shell",
-        help="Open interactive PostgreSQL shell (psql)"
-    )
+    subparsers.add_parser("shell", help="Open interactive PostgreSQL shell (psql)")
 
     args = parser.parse_args()
 

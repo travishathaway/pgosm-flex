@@ -3,8 +3,8 @@
 import os
 
 import pytest
-
-from pgosm_flex import main as pgosm_flex, helpers
+from pgosm_flex import helpers
+from pgosm_flex import main as pgosm_flex
 
 pgosm_flex.setup_logger(debug=True)
 

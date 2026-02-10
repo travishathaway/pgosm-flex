@@ -124,7 +124,7 @@ class RegionConfig(BaseModel):
     region: str | None = None
     subregion: str | None = None
     input_file: Path | None = None
-    pgosm_date: str | None = None
+    pgosm_date: str = Field(default_factory=get_today)
     skip_verify_checksum: bool = False
 
     @field_validator("input_file", mode="before")
@@ -207,9 +207,6 @@ class RegionConfig(BaseModel):
                     data["pgosm_date"] = pgosm_datetime.strftime("%Y-%m-%d")
                 except RuntimeError as err:
                     raise ValueError("Error parsing pgosm date file input_file") from err
-
-        elif data.get("pgosm_date") is None:
-            data["pgosm_date"] = get_today()
 
         return data
 
@@ -440,7 +437,7 @@ class PgOSMFlexConfig(BaseModel):
         env_prefix="PGOSM_", env_nested_delimiter="__", extra="forbid"
     )
 
-    def to_env_vars(self) -> dict[str, str]:
+    def to_env_vars(self) -> dict:
         """Convert configuration to environment variable dict.
 
         Used for backward compatibility during migration.
@@ -448,8 +445,7 @@ class PgOSMFlexConfig(BaseModel):
 
         Returns
         -------
-        dict[str, str]
-            Dictionary of environment variables
+        Dictionary of environment variables
         """
         env = {}
 
