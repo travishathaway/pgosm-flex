@@ -12,7 +12,6 @@ import json
 import logging
 import os
 from contextvars import ContextVar
-from importlib import resources
 from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import quote
@@ -385,7 +384,6 @@ class ProcessingConfig(BaseModel):
     srid: str = "3857"  # helpers.DEFAULT_SRID
     language: str = "en"
     schema_name: str = "osm"
-    base_path: Path | None = Field(default_factory=lambda: Path(str(resources.files("pgosm_flex"))))
     data_dir: Path | None = None  # Override data directory
     debug: bool = False
 
@@ -396,17 +394,6 @@ class ProcessingConfig(BaseModel):
         if v <= 0:
             msg = "RAM must be a positive number"
             raise ValueError(msg)
-        return v
-
-    @field_validator("base_path")
-    @classmethod
-    def validate_base_path(cls, v):
-        """Validate base_path is absolute if provided."""
-        if v is not None:
-            path = Path(v)
-            if not path.is_absolute():
-                msg = "base_path must be an absolute path"
-                raise ValueError(msg)
         return v
 
     @field_validator("data_dir")
@@ -690,7 +677,6 @@ class ConfigLoader:
             "srid": ("processing", "srid"),
             "language": ("processing", "language"),
             "schema_name": ("processing", "schema_name"),
-            "base_path": ("processing", "base_path"),
             "data_dir": ("processing", "data_dir"),
             "debug": ("processing", "debug"),
         }

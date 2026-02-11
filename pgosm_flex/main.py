@@ -15,6 +15,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 import click
+from platformdirs import user_cache_dir
 
 from pgosm_flex import __version__, db, geofabrik, helpers
 from pgosm_flex import osm2pgsql_recommendation as rec
@@ -124,11 +125,6 @@ from pgosm_flex.config import get_config, init_config
     help="EXPERIMENTAL - Wrap around osm2pgsql create v. append modes, without using osm2pgsql-replication.",
 )
 @click.option(
-    "--base-path",
-    default=None,
-    help='base path containing files necessary for import. default "/app"',
-)
-@click.option(
     "--data-dir",
     default=None,
     type=click.Path(path_type=Path),
@@ -193,7 +189,6 @@ def run_pgosm_flex(
     skip_qgis_style,
     srid,
     update,
-    base_path,
     data_dir,
     skip_verify_checksum,
     pg_host,
@@ -222,7 +217,6 @@ def run_pgosm_flex(
         "skip_qgis_style": skip_qgis_style,
         "srid": srid,
         "update": update,
-        "base_path": base_path,
         "data_dir": data_dir,
         "skip_verify_checksum": skip_verify_checksum,
         "pg_host": pg_host,
@@ -300,7 +294,6 @@ def run_pgosm_flex(
     else:
         logger.info("Running osm2pgsql")
         success = run_osm2pgsql_standard(
-            input_file=config.region.input_file_str,
             out_path=paths["out_path"],
             flex_path=paths["flex_path"],
             skip_nested=config.import_mode.skip_nested,
@@ -330,13 +323,12 @@ def run_pgosm_flex(
     logger.info("PgOSM Flex complete!")
 
 
-def run_osm2pgsql_standard(input_file, out_path, flex_path, skip_nested, import_mode, debug):
+def run_osm2pgsql_standard(out_path, flex_path, skip_nested, import_mode, debug):
     """Runs standard osm2pgsql command and optionally inits for replication
     (osm2pgsql-replication) mode.
 
     Parameters
     ----------
-    input_file : str
     out_path : str
     flex_path : str
     skip_nested : boolean
@@ -381,7 +373,7 @@ def run_osm2pgsql_standard(input_file, out_path, flex_path, skip_nested, import_
     else:
         logger.debug("Not using replication mode")
 
-    if input_file is None:
+    if config.region.input_file is None:
         geofabrik.remove_latest_files(out_path)
 
     return post_processing
@@ -615,8 +607,6 @@ def get_paths():
     -------
     paths : dict
     """
-    from platformdirs import user_cache_dir
-
     config = get_config()
     base_path = Path(str(resources.files("pgosm_flex")))
 
@@ -743,10 +733,6 @@ def check_layerset_skip_nested_place(flex_path: str) -> bool:
 
 def layerset_include_place(flex_path: str) -> bool:
     """
-    Parameters
-    ----------
-    flex_path : str
-
     Returns
     -------
     place : bool
@@ -797,8 +783,6 @@ def run_post_processing(flex_path, skip_nested: bool) -> bool:
     -------
     status : bool
     """
-    from pathlib import Path
-
     logger = logging.getLogger("pgosm-flex")
     config = get_config()
 
@@ -830,15 +814,11 @@ def run_post_processing(flex_path, skip_nested: bool) -> bool:
     return post_processing_sql
 
 
-def dump_database(input_file, out_path, pg_dump, skip_qgis_style):
-    """Runs pg_dump when necessary to export the processed OpenStreetMap data.
-
-    Parameters
-    ----------
-    input_file : str
-    out_path : str
-    pg_dump : bool
-    skip_qgis_style : bool
+def dump_database(
+    input_file: str | None, out_path: str | None, pg_dump: bool, skip_qgis_style: bool
+) -> None:
+    """
+    Runs pg_dump when necessary to export the processed OpenStreetMap data.
     """
     if pg_dump:
         export_filename = get_export_filename(input_file)

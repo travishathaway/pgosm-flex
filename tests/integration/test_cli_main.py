@@ -1,5 +1,5 @@
 """
-Pairwise combination tests for pgosm-flex CLI.
+Pairwise combination tests for the main rountine in pgosm-flex CLI.
 
 Uses pairwise testing strategy to cover all pairs of important parameters
 with minimal test cases. This reduces test complexity from O(n^m) to O(n*m)
@@ -24,12 +24,13 @@ from pgosm_flex.main import run_pgosm_flex
 from .conftest import (
     LAYERSET_BASIC_TABLES,
     LAYERSET_DEFAULT_TABLES,
+    LAYERSET_EVERYTHING_TABLES,
     LAYERSET_MINIMAL_TABLES,
     DBInfo,
 )
 
 #: Available layerset choices
-LayerSet = Literal["default", "basic", "minimal"]
+LayerSet = Literal["default", "basic", "minimal", "everything"]
 
 #: Available data source types
 DataSource = Literal["geofabrik", "file"]
@@ -46,6 +47,7 @@ EXPECTED_TABLES_SKIP_NESTED = {
     "default": LAYERSET_DEFAULT_TABLES,
     "basic": LAYERSET_BASIC_TABLES,
     "minimal": LAYERSET_MINIMAL_TABLES,
+    "everything": LAYERSET_EVERYTHING_TABLES,
 }
 
 #: Expected tables by layerset (when skip_nested=False)
@@ -53,6 +55,7 @@ EXPECTED_TABLES_WITH_NESTED = {
     "default": [*LAYERSET_DEFAULT_TABLES, "place_polygon_nested"],
     "basic": [*LAYERSET_BASIC_TABLES, "place_polygon_nested"],
     "minimal": [*LAYERSET_MINIMAL_TABLES, "place_polygon_nested"],
+    "everything": [*LAYERSET_EVERYTHING_TABLES, "place_polygon_nested"],
 }
 
 
@@ -78,6 +81,8 @@ def get_command_args(
     temp_work_dir: Path,
     skip_nested: bool = True,
     skip_qgis_style: bool = True,
+    replication: bool = False,
+    pg_dump: bool = False,
 ) -> list[str]:
     """
     Build CLI arguments for pgosm-flex command.
@@ -134,6 +139,12 @@ def get_command_args(
 
     if skip_qgis_style:
         args.append("--skip-qgis-style")
+
+    if replication:
+        args.append("--replication")
+
+    if pg_dump:
+        args.append("--pg-dump")
 
     return args
 
@@ -203,10 +214,19 @@ PAIRWISE_TEST_MATRIX = [
         "data_source": "geofabrik",
     },
     {
-        "id": "minimal_with_nested_file_with_qgis",
+        "id": "minimal_with_nested_file_with_qgis_and_pg_dump",
         "layerset": "minimal",
         "skip_nested": False,
         "skip_qgis_style": False,
+        "data_source": "file",
+        "pg_dump": True,
+    },
+    {
+        "id": "minimal_with_nested_file_with_replication",
+        "layerset": "minimal",
+        "skip_nested": True,
+        "skip_qgis_style": True,
+        "replication": True,
         "data_source": "file",
     },
     {
@@ -233,6 +253,20 @@ PAIRWISE_TEST_MATRIX = [
     {
         "id": "default_with_nested_file_skip_qgis",
         "layerset": "default",
+        "skip_nested": False,
+        "skip_qgis_style": True,
+        "data_source": "file",
+    },
+    {
+        "id": "everything_skip_nested_geofabrik_with_qgis",
+        "layerset": "everything",
+        "skip_nested": True,
+        "skip_qgis_style": False,
+        "data_source": "geofabrik",
+    },
+    {
+        "id": "everything_with_nested_file_skip_qgis",
+        "layerset": "everything",
         "skip_nested": False,
         "skip_qgis_style": True,
         "data_source": "file",

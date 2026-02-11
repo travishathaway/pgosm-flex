@@ -392,22 +392,6 @@ class TestProcessingConfig:
         config = ProcessingConfig(ram=4.0, language="en")
         assert config.language == "en"
 
-    def test_base_path_default(self):
-        """Test base_path defaults to None."""
-        config = ProcessingConfig(ram=4.0)
-        assert config.base_path == resources.files("pgosm_flex")
-
-    def test_base_path_absolute(self):
-        """Test base_path with absolute path."""
-        config = ProcessingConfig(ram=4.0, base_path=Path("/app"))
-        assert config.base_path == Path("/app")
-
-    def test_base_path_validation_relative(self):
-        """Test base_path validation fails for relative path."""
-        with pytest.raises(ValueError) as exc_info:
-            ProcessingConfig(ram=4.0, base_path=Path("relative/path"))
-        assert "base_path must be an absolute path" in str(exc_info.value)
-
     def test_debug_default(self):
         """Test debug defaults to False."""
         config = ProcessingConfig(ram=4.0)
