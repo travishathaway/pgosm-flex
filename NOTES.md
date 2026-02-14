@@ -223,7 +223,7 @@ I now have a very basic happy path working for the tool. I'm using the `tests/da
 file to make sure that all the importing logic works. Now, I'm ready to automate this with my own integration
 tests.
 
-### No more lua dependencies
+### No more luarocks dependencies
 
 I really wanted to ensure that the lua scripts had zero external dependencies. This makes it, so I don't
 have to install them separately. In conda environment this is definitely possible with `luarocks`, but
@@ -254,5 +254,26 @@ geofabrik files by using the `--region` and `--subregion` options and testing th
   - Downloading data from geofabrik
 - Not sure if the new drop tables routine works as expected
 - Something is creating `checksum-test.txt` files and I need to figure out why
+
+
+## 2026-02-11: Planning for integration testing
+
+I've been working on measuring and increasing the test coverage on the code of the last couple of days.
+As of now, I've got ~81% coverage on this project. Most of the things left to cover are the various
+error cases that can occur with various configurations. I also still need to cover the `--update=append/create`
+cases.
+
+One of the last things remaining to be changed is the `drop_db` behavior. For this project, I've decided
+to not actually drop/create the database. This is something that I prefer to handle externally from the
+CLI program. Instead, the program will simply drop tables from the specified schema. This a safer action
+because it's only targeting a single schema in a database. Because of that, I want to enable dropping
+on more than just `localhost`. The `localhost` only behavior is a leftover from the Docker setup that
+I want to get rid of.
+
+### Random notes
+
+- Setup integration tests to run pgosm-flex as a non-superuser
+- Need to test the `--force` option when the databse already has tables in it
+
 
 

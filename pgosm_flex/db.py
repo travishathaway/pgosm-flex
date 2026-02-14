@@ -107,33 +107,28 @@ def prepare_pgosm_db(db_path):
     """
     config = get_config()
 
-    # TODO: there's probably a more robust way to check for localhost (what about 127.0.0.1?)
-    if config.database.host == "localhost":
-        drop_it = True
-        LOGGER.debug(
-            "Running standard database prep for localhost database. Includes DROP/CREATE DATABASE"
-        )
-        LOGGER.debug(f"import_mode: {config.import_mode.as_json()}")
-        if config.import_mode.slim_no_drop:
-            if not config.import_mode.append_first_run:
-                drop_it = False
-            if config.import_mode.replication_update:
-                drop_it = False
+    drop_it = True
 
-        if drop_it:
-            LOGGER.debug("Dropping local database if exists")
-            drop_pgosm_db()
-        else:
-            LOGGER.debug(
-                "Not dropping local DB. This is expected with subsequent import via --replication OR --update=append."
-            )
+    LOGGER.debug(
+        "Running standard database prep for localhost database. Includes DROP/CREATE DATABASE"
+    )
+    LOGGER.debug(f"import_mode: {config.import_mode.as_json()}")
 
-        create_pgosm_db()
+    if config.import_mode.slim_no_drop:
+        if not config.import_mode.append_first_run:
+            drop_it = False
+        if config.import_mode.replication_update:
+            drop_it = False
 
+    if drop_it:
+        LOGGER.debug("Dropping local database if exists")
+        drop_pgosm_schema_tables()
     else:
-        LOGGER.info(
-            "Using external database. Ensure the target database is setup properly with proper permissions."
+        LOGGER.debug(
+            "Not dropping local DB. This is expected with subsequent import via --replication OR --update=append."
         )
+
+    create_pgosm_db()
 
     prepare_osm_schema(db_path=db_path)
     run_insert_pgosm_road(db_path=db_path, schema_name=config.processing.schema_name)
@@ -220,19 +215,8 @@ def pg_version_check():
     return pg_version
 
 
-def drop_pgosm_db():
-    """Drops the pgosm database if it exists.
-
-    Intentionally hard coded to `pgosm` database for in-Docker use only.
-
-    Returns
-    -------
-    status : bool
-
-    TODO:
-        Don't drop the database. Let's instead drop all the tables in the specified
-        schema instead.
-    """
+def drop_pgosm_schema_tables() -> None:
+    """Drops the pgosm database schema tables if they exist."""
     config = get_config()
 
     sql_stmt = sql.SQL("""
