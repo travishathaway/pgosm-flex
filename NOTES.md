@@ -275,5 +275,11 @@ I want to get rid of.
 - Setup integration tests to run pgosm-flex as a non-superuser
 - Need to test the `--force` option when the databse already has tables in it
 
+## 2026-02-14
+
+### Random notes
+
+- Setting the SRID from the configuration file doesn't work
+- Need to add test that set values from the configuration file
 
 
