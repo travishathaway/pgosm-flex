@@ -41,5 +41,4 @@ ram = 4.0                  # Required: Amount of RAM in GB
 srid = "3857"              # Spatial reference (default: Web Mercator)
 language = "en"            # Default language for names
 schema_name = "osm"        # PostgreSQL schema name
-# base_path = "/app"       # Base path for files (default: /app)
 debug = false              # Enable debug logging
