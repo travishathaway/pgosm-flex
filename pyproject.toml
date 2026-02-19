@@ -55,7 +55,6 @@ pydantic-settings = ">=2.0"
 tomli = ">=2.0.1" #; python_version<'3.11'",
 postgresql = ">=18"
 postgis = "*"
-luarocks = "*"
 osmium-tool = "*"
 osm2pgsql = ">=2"
 
