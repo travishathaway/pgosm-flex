@@ -122,7 +122,7 @@ def prepare_pgosm_db(db_path):
 
     if drop_it:
         LOGGER.debug("Dropping local database if exists")
-        drop_pgosm_schema_tables()
+        drop_pgosm_schema()
     else:
         LOGGER.debug(
             "Not dropping local DB. This is expected with subsequent import via --replication OR --update=append."
@@ -137,7 +137,7 @@ def prepare_pgosm_db(db_path):
         osm2pgsql_replication_start()
 
 
-def start_import(osm2pgsql_version, schema_name):
+def start_import(osm2pgsql_version):
     """Creates record in osm.pgosm_flex table.
 
     Parameters
@@ -215,8 +215,8 @@ def pg_version_check():
     return pg_version
 
 
-def drop_pgosm_schema_tables() -> None:
-    """Drops the pgosm database schema tables if they exist."""
+def drop_pgosm_schema() -> None:
+    """Drops the pgosm database schema if it exists."""
     config = get_config()
 
     sql_stmt = sql.SQL("""
@@ -236,21 +236,21 @@ def drop_pgosm_schema_tables() -> None:
 
         if len(results) > 0:
             if config.import_mode.force:
-                LOGGER.info("Force drop all tables")
-                for table in results:
-                    sql_drop_table = sql.SQL("DROP TABLE IF EXISTS {}.{} CASCADE").format(
-                        sql.Identifier(config.processing.schema_name), sql.Identifier(table[0])
-                    )
-                    cursor.execute(sql_drop_table)
+                LOGGER.info(f"Dropping schema {config.processing.schema_name}")
+                LOGGER.info(f"Dropping {len(results)} tables")
+                sql_drop_schema = sql.SQL("DROP SCHEMA IF EXISTS {} CASCADE").format(
+                    sql.Identifier(config.processing.schema_name)
+                )
+                cursor.execute(sql_drop_schema)
                 conn.close()
-                LOGGER.info(f"Dropped tables in schema {config.processing.schema_name}")
             else:
                 LOGGER.error("Schema not empty; use --force to remove existing tables")
                 sys.exit(1)
 
 
 def create_pgosm_db():
-    """Creates the pgosm database and prepares with PostGIS and osm schema
+    """
+    Creates the pgosm database and prepares with PostGIS and osm schema
 
     Returns
     -------

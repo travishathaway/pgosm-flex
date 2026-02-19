@@ -137,7 +137,7 @@ def get_pbf_url(region: str, subregion: str | None) -> str:
     return pbf_url
 
 
-def download_data(region: str, subregion: str | None, pbf_file: str, md5_file: str) -> None:
+def download_data(region: str, subregion: str | None, pbf_file: str) -> None:
     """Downloads PBF and MD5 file using wget.
 
     Parameters
@@ -145,7 +145,6 @@ def download_data(region: str, subregion: str | None, pbf_file: str, md5_file: s
     region : str
     subregion : str
     pbf_file : str
-    md5_file : str
     """
     logger = logging.getLogger("pgosm-flex")
     logger.info(f"Downloading PBF data to {pbf_file}")
@@ -154,9 +153,23 @@ def download_data(region: str, subregion: str | None, pbf_file: str, md5_file: s
     pbf_folder = os.path.dirname(pbf_file)
     os.makedirs(pbf_folder, exist_ok=True)
 
-    resp = httpx.get(pbf_url, follow_redirects=True)
-    with open(pbf_file, "wb") as f:
-        f.write(resp.content)
+    with httpx.stream("GET", pbf_url, timeout=None, follow_redirects=True) as response:
+        response.raise_for_status()
+        total = int(response.headers.get("content-length", 0))
+        downloaded = 0
+        last_logged_pct = 0
+        log_every_pct = 20
+
+        with open(pbf_file, "wb") as f:
+            for chunk in response.iter_bytes(chunk_size=8192):
+                f.write(chunk)
+                downloaded += len(chunk)
+
+                if total:
+                    pct = int(downloaded / total * 100)
+                    if pct >= last_logged_pct + log_every_pct:
+                        logger.info(f"Download progress: {pct}% ({downloaded}/{total} bytes)")
+                        last_logged_pct = pct
 
     resp = httpx.get(f"{pbf_url}.md5", follow_redirects=True)
     with open(f"{pbf_file}.md5", "w") as f:

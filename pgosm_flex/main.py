@@ -22,6 +22,7 @@ from pgosm_flex import osm2pgsql_recommendation as rec
 from pgosm_flex.config import get_config, init_config
 
 
+# TODO: The defaults listed in the "help" strings should come from the pydantic models
 @click.command()
 # Required and most common options first
 @click.option(
@@ -53,80 +54,68 @@ from pgosm_flex.config import get_config, init_config
 @click.option(
     "--input-file",
     required=False,
-    default=None,
     help="Set filename or absolute filepath to input osm.pbf file. Overrides default file handling, archiving, "
     "and MD5 checksum validation.",
 )
 @click.option(
     "--layerset",
     required=False,
-    default="default",
     help="Layerset to load. Defines name of included layerset unless --layerset-path is defined.",
 )
 @click.option("--layerset-path", required=False, help="Custom path to load layerset INI from.")
 @click.option(
     "--language",
-    default=None,
     envvar="PGOSM_LANGUAGE",
     help="Set default language in loaded OpenStreetMap data when available.  e.g. 'en' or 'kn'.",
 )
 @click.option(
     "--pg-dump",
-    default=False,
     is_flag=True,
     help="Uses pg_dump after processing is completed to enable easily load OpenStreetMap data into a different database",
 )
 @click.option(
     "--pgosm-date",
     required=False,
-    default=helpers.get_today(),
     envvar="PGOSM_DATE",
     help="Date of the data in YYYY-MM-DD format. If today (default), automatically downloads when files not found "
     "locally. Set to historic date to load locally archived PBF/MD5 file, will fail if both files do not exist.",
 )
 @click.option(
     "--replication",
-    default=False,
     is_flag=True,
     help="Replication mode enables updates via osm2pgsql-replication.",
 )
 @click.option(
-    "--schema-name", default="osm", help="Schema name to load OpenStreetMap data into.  Default osm"
+    "--schema-name", help="Schema name to load OpenStreetMap data into.  Default osm"
 )
 @click.option(
     "--skip-nested",
-    default=False,
     is_flag=True,
     help="When set, skips calculating nested admin polygons. Can be time consuming on large regions.",
 )
 @click.option(
     "--skip-qgis-style",
-    default=False,
     is_flag=True,
     help="When set, skips running importing QGIS Styles.",
 )
 @click.option(
     "--skip-verify-checksum",
-    default=False,
     is_flag=True,
     help="When set, skips verifying the md5 checksum from Geofabrik",
 )
 @click.option(
     "--srid",
     required=False,
-    default=helpers.DEFAULT_SRID,
     envvar="PGOSM_SRID",
     help=f"SRID for data loaded by osm2pgsql to PostGIS. Defaults to SRID {helpers.DEFAULT_SRID}.",
 )
 @click.option(
     "--update",
-    default=None,
     type=click.Choice(["append", "create"], case_sensitive=True),
     help="EXPERIMENTAL - Wrap around osm2pgsql create v. append modes, without using osm2pgsql-replication.",
 )
 @click.option(
     "--data-dir",
-    default=None,
     type=click.Path(path_type=Path),
     help="Directory for downloaded OSM data files. Defaults to platform-specific cache directory.",
 )
@@ -134,7 +123,6 @@ from pgosm_flex.config import get_config, init_config
     "--db-host",
     "--pg-host",
     "pg_host",
-    default=None,
     envvar="POSTGRES_HOST",
     help="PostgreSQL host. Defaults to localhost",
 )
@@ -142,7 +130,6 @@ from pgosm_flex.config import get_config, init_config
     "--db-port",
     "--pg-port",
     "pg_port",
-    default=None,
     type=int,
     envvar="POSTGRES_PORT",
     help="PostgreSQL port. Defaults to 5432",
@@ -151,7 +138,6 @@ from pgosm_flex.config import get_config, init_config
     "--db-name",
     "--pg-dbname",
     "pg_dbname",
-    default=None,
     envvar="POSTGRES_DB",
     help="PostgreSQL database name. Defaults to pgosm",
 )
@@ -159,7 +145,6 @@ from pgosm_flex.config import get_config, init_config
     "--db-user",
     "--pg-user",
     "pg_user",
-    default=None,
     envvar="POSTGRES_USER",
     help="PostgreSQL user. Defaults to postgres",
 )
@@ -167,7 +152,6 @@ from pgosm_flex.config import get_config, init_config
     "--db-password",
     "--pg-password",
     "pg_password",
-    default=None,
     envvar="POSTGRES_PASSWORD",
     help="PostgreSQL password. Optional.",
 )
@@ -280,9 +264,7 @@ def run_pgosm_flex(
         cmd=["osm2pgsql", "--version"], cwd="/usr/bin/", output_lines=vers_lines
     )
 
-    import_id = db.start_import(
-        osm2pgsql_version=vers_lines, schema_name=config.processing.schema_name
-    )
+    import_id = db.start_import(vers_lines)
 
     logger.info(f"Started import id {import_id}")
 
