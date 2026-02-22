@@ -273,13 +273,24 @@ I want to get rid of.
 ### Random notes
 
 - Setup integration tests to run pgosm-flex as a non-superuser
-- Need to test the `--force` option when the databse already has tables in it
+- Need to test the `--force` option when the database already has tables in it
+
 
 ## 2026-02-14
 
 ### Random notes
 
-- Setting the SRID from the configuration file doesn't work
+- Setting the SRID from the configuration file doesn't work (fixed)
 - Need to add test that set values from the configuration file
 
 
+## 2026-02-22
+
+Today, I'd like to write some tests that focus on what it's like to work with an existing
+database with tables loaded into it. Here are the scenarios I'll focus on:
+
+- Using the `--force` option
+  - This will essentially just run the loading twice. Once without `--force` and then once
+    with `--force`
+- Using the `update`
+- 

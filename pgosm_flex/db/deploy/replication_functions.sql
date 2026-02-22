@@ -13,8 +13,11 @@ CREATE OR REPLACE PROCEDURE {schema_name}.append_data_start()
 
  BEGIN
 
-    RAISE NOTICE 'Truncating table {schema_name}.place_polygon_nested;';
-    TRUNCATE TABLE {schema_name}.place_polygon_nested;
+    IF to_regclass('{schema_name}.place_polygon_nested') IS NOT NULL
+    THEN
+        RAISE NOTICE 'Truncating table {schema_name}.place_polygon_nested;';
+        TRUNCATE TABLE {schema_name}.place_polygon_nested;
+    END IF;
 
 END $$;
 

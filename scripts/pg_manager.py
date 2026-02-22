@@ -26,6 +26,7 @@ from pgosm_flex.postgres import Platform, PostgresCluster
 
 # Constants
 DEFAULT_PORT = int(os.environ.get("PGOSM_PG_PORT", "65432"))
+DEFAULT_DATA_DIR = os.environ.get("PGOSM_PG_DATA_DIR", str(Path.cwd() / ".pgdata"))
 DEFAULT_USER = "postgres"
 DEFAULT_DB = "pgosm"
 
@@ -71,7 +72,7 @@ def cmd_start(args: argparse.Namespace) -> int:
     -------
         Exit code (0 for success, non-zero for error)
     """
-    data_dir = Path.cwd() / ".pgdata"
+    data_dir = Path(args.data_dir)
     cluster = PostgresCluster(data_dir, args.port, DEFAULT_USER)
 
     # 1. Check if already running
@@ -134,7 +135,7 @@ def cmd_stop(args: argparse.Namespace) -> int:
     -------
         Exit code (0 for success, non-zero for error)
     """
-    data_dir = Path.cwd() / ".pgdata"
+    data_dir = Path(args.data_dir)
     cluster = PostgresCluster(data_dir, args.port, DEFAULT_USER)
 
     if not cluster.data_mgr.exists():
@@ -163,7 +164,7 @@ def cmd_destroy(args: argparse.Namespace) -> int:
     -------
         Exit code (0 for success, non-zero for error)
     """
-    data_dir = Path.cwd() / ".pgdata"
+    data_dir = Path(args.data_dir)
     cluster = PostgresCluster(data_dir, args.port, DEFAULT_USER)
 
     # Stop if running
@@ -206,7 +207,7 @@ def cmd_status(args: argparse.Namespace) -> int:
     -------
         Exit code (0 for success)
     """
-    data_dir = Path.cwd() / ".pgdata"
+    data_dir = Path(args.data_dir)
     cluster = PostgresCluster(data_dir, args.port, DEFAULT_USER)
 
     if not cluster.data_mgr.exists():
@@ -249,7 +250,7 @@ def cmd_shell(args: argparse.Namespace) -> int:
     -------
         Exit code from psql (0 for success, non-zero for error)
     """
-    data_dir = Path.cwd() / ".pgdata"
+    data_dir = Path(args.data_dir)
     cluster = PostgresCluster(data_dir, args.port, DEFAULT_USER)
 
     # Check if PostgreSQL is running
@@ -306,20 +307,41 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python scripts/pg_manager.py start              # Start PostgreSQL on default port (65432)
-  python scripts/pg_manager.py --port 54321 start # Start on custom port
-  python scripts/pg_manager.py status             # Check status
-  python scripts/pg_manager.py stop               # Stop (preserve data)
-  python scripts/pg_manager.py destroy            # Stop and remove data (interactive)
-  python scripts/pg_manager.py destroy --force    # Stop and remove data (no confirmation)
+  # Start PostgreSQL on default port (65432)
+  python scripts/pg_manager.py start
+
+  # Start PostgreSQL on default port (65432)
+  python scripts/pg_manager.py start --data-dir /vol/postgres/
+
+  # Start on custom port
+  python scripts/pg_manager.py --port 54321 start
+
+  # Check status
+  python scripts/pg_manager.py status
+
+  # Stop (preserve data)
+  python scripts/pg_manager.py stop
+
+  # Stop and remove data (interactive)
+  python scripts/pg_manager.py destroy
+
+  # Stop and remove data (no confirmation)
+  python scripts/pg_manager.py destroy --force
 
 Environment variables:
-  PGOSM_PG_PORT    PostgreSQL port (default: 65432)
+  PGOSM_PG_PORT      PostgreSQL port (default: 65432)
+  PGOSM_PG_DATA_DIR  PostgreSQL data directory (default: current working directory)
         """,
     )
 
     parser.add_argument(
         "--port", type=int, default=DEFAULT_PORT, help=f"PostgreSQL port (default: {DEFAULT_PORT})"
+    )
+    parser.add_argument(
+        "--data-dir",
+        type=str,
+        default=DEFAULT_DATA_DIR,
+        help=f"PostgreSQL data directory (default: {DEFAULT_DATA_DIR})",
     )
 
     subparsers = parser.add_subparsers(dest="command", required=True)

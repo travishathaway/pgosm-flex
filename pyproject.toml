@@ -74,11 +74,11 @@ pylint = ">=4.0.4,<5"
 commitizen = ">=4.13.5,<5"
 
 [tool.pixi.tasks]
-"pg:start" = "python scripts/pg_manager.py start"
-"pg:stop" = "python scripts/pg_manager.py stop"
-"pg:destroy" = "python scripts/pg_manager.py destroy --force"
-"pg:status" = "python scripts/pg_manager.py status"
-"pg:shell" = "python scripts/pg_manager.py shell"
+"pg:start" = { cmd = "python scripts/pg_manager.py --data-dir {{ data_dir }} start",  args = [{"arg" = "data_dir", default = "./" }]}
+"pg:stop" = { cmd = "python scripts/pg_manager.py --data-dir {{ data_dir }} stop",  args = [{"arg" = "data_dir", default = "./" }]}
+"pg:destroy" = { cmd = "python scripts/pg_manager.py --data-dir {{ data_dir }} destroy",  args = [{"arg" = "data_dir", default = "./" }]}
+"pg:status" = { cmd = "python scripts/pg_manager.py --data-dir {{ data_dir }} status",  args = [{"arg" = "data_dir", default = "./" }]}
+"pg:shell" = { cmd = "python scripts/pg_manager.py --data-dir {{ data_dir }} shell",  args = [{"arg" = "data_dir", default = "./" }]}
 
 [tool.pixi.feature.dev.tasks]
 test = "pytest tests"
