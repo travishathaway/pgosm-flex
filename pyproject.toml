@@ -20,7 +20,7 @@ packages = ["pgosm_flex"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"
-testpaths = ["tests/tests", "tests/integration"]
+testpaths = ["tests/unit", "tests/integration"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]

@@ -12,7 +12,7 @@ These tests verify both data sources:
 
 import shutil
 import tempfile
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from importlib import resources
 from pathlib import Path
 from typing import Literal
@@ -223,14 +223,6 @@ PAIRWISE_TEST_MATRIX = [
         "pg_dump": True,
     },
     {
-        "id": "minimal_with_nested_file_with_replication",
-        "layerset": "minimal",
-        "skip_nested": True,
-        "skip_qgis_style": True,
-        "replication": True,
-        "data_source": "file",
-    },
-    {
         "id": "basic_skip_nested_file_with_qgis",
         "layerset": "basic",
         "skip_nested": True,
@@ -404,7 +396,7 @@ def test_replication_mode(test_database: DBInfo, temp_work_dir: Path) -> None:
         It would be nice to add an SQL query to validate that what's going into the database
         has actually been updated between running `pgosm-flex` twice.
     """
-    six_days_ago = datetime.now() - timedelta(days=6)
+    six_days_ago = datetime.now(UTC) - timedelta(days=6)
     six_days_ago_str = six_days_ago.strftime("%Y-%m-%d")
     layerset: LayerSet = "default"
 
@@ -430,3 +422,45 @@ def test_replication_mode(test_database: DBInfo, temp_work_dir: Path) -> None:
     assert result.exit_code == 0, f"CLI failed: {result.output}"
 
     verify_tables_created(test_database=test_database, layerset=layerset, skip_nested=True)
+
+
+@pytest.mark.integration
+@pytest.mark.slow
+@pytest.mark.timeout(300)
+def test_force_removes_existing_tables(test_database: DBInfo, temp_work_dir: Path) -> None:
+    """
+    Runs `pgosm-flex` twice; once with layerset "default" and the second time with --force
+    set and layerset set to "minimal" so that the tables are different.
+    """
+    layerset_initial: LayerSet = "default"
+    layerset_second: LayerSet = "minimal"
+
+    runner = CliRunner()
+
+    # First run with "default" as layerset
+    args = get_command_args(
+        data_source="file",
+        test_database=test_database,
+        temp_work_dir=temp_work_dir,
+        layerset=layerset_initial,
+        skip_nested=True,
+    )
+
+    result = runner.invoke(run_pgosm_flex, args)
+
+    assert result.exit_code == 0, f"CLI failed: {result.output}"
+    verify_tables_created(test_database=test_database, layerset=layerset_initial, skip_nested=True)
+
+    # Second run with "minimal" as layerset
+    args = get_command_args(
+        data_source="file",
+        test_database=test_database,
+        temp_work_dir=temp_work_dir,
+        layerset=layerset_second,
+        skip_nested=True,
+    )
+
+    result = runner.invoke(run_pgosm_flex, args + ["--force"])
+
+    assert result.exit_code == 0, f"CLI failed: {result.output}"
+    verify_tables_created(test_database=test_database, layerset=layerset_second, skip_nested=True)

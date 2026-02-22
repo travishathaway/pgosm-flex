@@ -3,7 +3,7 @@
 import logging
 import os
 import shutil
-from datetime import datetime
+from datetime import UTC, datetime
 
 import httpx
 
@@ -114,8 +114,9 @@ def pbf_download_needed(pbf_file_with_date: str, md5_file_with_date: str, pgosm_
 def get_pbf_url(region: str, subregion: str | None, pgosm_date: str | None = None) -> str:
     """Returns the URL to the PBF for the region / subregion."""
     logger = logging.getLogger("pgosm-flex")
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
 
-    if pgosm_date is None:
+    if pgosm_date is None or pgosm_date == today:
         pgosm_date = "latest"
     else:
         try:

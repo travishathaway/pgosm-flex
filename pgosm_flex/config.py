@@ -58,7 +58,7 @@ def get_today() -> str:
     -------
     today : str
     """
-    return datetime.datetime.today().strftime("%Y-%m-%d")
+    return datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d")
 
 
 class DatabaseConfig(BaseModel):

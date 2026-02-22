@@ -281,7 +281,11 @@ I want to get rid of.
 ### Random notes
 
 - Setting the SRID from the configuration file doesn't work (fixed)
+  - This error had to do with how I was setting defaults in the CLI options.
+  - Because we have defaults set in the config system now, I've removed all
+    the defaults from the CLI options.
 - Need to add test that set values from the configuration file
+  - This should be done in an integration test
 
 
 ## 2026-02-22
@@ -292,5 +296,6 @@ database with tables loaded into it. Here are the scenarios I'll focus on:
 - Using the `--force` option
   - This will essentially just run the loading twice. Once without `--force` and then once
     with `--force`
-- Using the `update`
-- 
+- Using the `--replication` twice; once with a dataset that's six days old and once with
+  a datatset from today.
+
