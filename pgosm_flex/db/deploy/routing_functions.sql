@@ -243,18 +243,31 @@ COMMENT ON PROCEDURE {schema_name}.routing_prepare_edge_network() IS 'Requires `
 
 
 
-CREATE OR REPLACE PROCEDURE {schema_name}.routing_prepare_road_network()
+CREATE OR REPLACE PROCEDURE {schema_name}.routing_prepare_road_network(
+    center_point GEOMETRY DEFAULT NULL,
+    buffer_distance_m DOUBLE PRECISION DEFAULT NULL
+)
 LANGUAGE plpgsql
 AS $$
 BEGIN
 
     CALL {schema_name}.extension_version_check();
 
+    IF center_point IS NOT NULL AND buffer_distance_m IS NULL THEN
+        RAISE EXCEPTION 'buffer_distance_m must be provided when center_point is set.';
+    END IF;
+
     --Create edges table for input to routing_prepare_edge_network procedure
     DROP TABLE IF EXISTS route_edge_input;
     CREATE TEMP TABLE route_edge_input AS
     SELECT osm_id, layer, geom
         FROM {schema_name}.road_line
+        WHERE center_point IS NULL
+           OR ST_DWithin(
+                ST_Transform(geom, 4326)::GEOGRAPHY,
+                ST_Transform(center_point, 4326)::GEOGRAPHY,
+                buffer_distance_m
+              )
     ;
 
     -- Creates the `route_edges_output` table.
@@ -404,7 +417,7 @@ BEGIN
 END $$;
 
 
-COMMENT ON PROCEDURE {schema_name}.routing_prepare_road_network IS 'Creates the {schema_name}.routing_road_edge and {schema_name}.routing_road_vertex from the {schema_name}.road_line input data';
+COMMENT ON PROCEDURE {schema_name}.routing_prepare_road_network IS 'Creates the {schema_name}.routing_road_edge and {schema_name}.routing_road_vertex from the {schema_name}.road_line input data. Optionally accepts center_point (any SRID) and buffer_distance_m (meters) to restrict the network to a buffer zone around a point.';
 
 
 
@@ -413,18 +426,31 @@ COMMENT ON PROCEDURE {schema_name}.routing_prepare_road_network IS 'Creates the 
 --------------------------------------------------
 
 
-CREATE OR REPLACE PROCEDURE {schema_name}.routing_prepare_water_network()
+CREATE OR REPLACE PROCEDURE {schema_name}.routing_prepare_water_network(
+    center_point GEOMETRY DEFAULT NULL,
+    buffer_distance_m DOUBLE PRECISION DEFAULT NULL
+)
 LANGUAGE plpgsql
 AS $$
 BEGIN
 
     CALL {schema_name}.extension_version_check();
 
+    IF center_point IS NOT NULL AND buffer_distance_m IS NULL THEN
+        RAISE EXCEPTION 'buffer_distance_m must be provided when center_point is set.';
+    END IF;
+
     --Create edges table for input to routing_prepare_edge_network procedure
     DROP TABLE IF EXISTS route_edge_input;
     CREATE TEMP TABLE route_edge_input AS
     SELECT osm_id, layer, geom
         FROM {schema_name}.water_line
+        WHERE center_point IS NULL
+           OR ST_DWithin(
+                ST_Transform(geom, 4326)::GEOGRAPHY,
+                ST_Transform(center_point, 4326)::GEOGRAPHY,
+                buffer_distance_m
+              )
     ;
 
     -- Creates the `route_edges_output` table.
@@ -545,7 +571,7 @@ BEGIN
 END $$;
 
 
-COMMENT ON PROCEDURE {schema_name}.routing_prepare_water_network IS 'Creates the {schema_name}.routing_water_edge and {schema_name}.routing_water_vertex from the {schema_name}.water_line input data';
+COMMENT ON PROCEDURE {schema_name}.routing_prepare_water_network IS 'Creates the {schema_name}.routing_water_edge and {schema_name}.routing_water_vertex from the {schema_name}.water_line input data. Optionally accepts center_point (any SRID) and buffer_distance_m (meters) to restrict the network to a buffer zone around a point.';
 
 
 
