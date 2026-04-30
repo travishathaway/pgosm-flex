@@ -85,18 +85,14 @@ from pgosm_flex.config import get_config, init_config
     is_flag=True,
     help="Replication mode enables updates via osm2pgsql-replication.",
 )
-@click.option(
-    "--schema-name", help="Schema name to load OpenStreetMap data into.  Default osm"
-)
+@click.option("--schema-name", help="Schema name to load OpenStreetMap data into.  Default osm")
 @click.option(
     "--skip-nested",
     is_flag=True,
     help="When set, skips calculating nested admin polygons. Can be time consuming on large regions.",
 )
 @click.option(
-    "--skip-qgis-style",
-    is_flag=True,
-    help="When set, skips running importing QGIS Styles.",
+    "--skip-qgis-style", is_flag=True, help="When set, skips running importing QGIS Styles."
 )
 @click.option(
     "--skip-verify-checksum",
@@ -508,8 +504,9 @@ def run_replication_update(skip_nested, flex_path):
     bool
         Indicates success/failure of replication process.
     """
+    config = get_config()
     logger = logging.getLogger("pgosm-flex")
-    conn_string = db.connection_string()
+    conn_string = config.database.connection_string()
 
     # Generate Lua configuration module first
     with generate_lua_config() as lua_config_path, lua_style() as tmp_lua_style:

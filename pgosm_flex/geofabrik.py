@@ -3,6 +3,7 @@
 import logging
 import os
 import shutil
+from datetime import UTC, datetime
 
 import httpx
 
@@ -61,7 +62,7 @@ def prepare_data(out_path: str, skip_verify_checksum: bool = False) -> str:
         logging.getLogger("pgosm-flex").info("Downloading PBF and MD5 files...")
         assert region is not None, "Region must be set when downloading from Geofabrik"
 
-        download_data(region, subregion, pbf_file, md5_file)
+        download_data(region, subregion, pbf_file, pgosm_date)
         archive_data(pbf_file, md5_file, pbf_file_with_date, md5_file_with_date)
     else:
         logging.getLogger("pgosm-flex").info("Copying Archived files")
@@ -97,58 +98,51 @@ def pbf_download_needed(pbf_file_with_date: str, md5_file_with_date: str, pgosm_
             logger.info("PBF & MD5 files exist.  Download not needed")
             download_needed = False
         elif pgosm_date == helpers.get_today():
-            print("PBF for today available but not MD5... download needed")
+            logger.warning("PBF for today available but not MD5... download needed")
             download_needed = True
         else:
             err = f"Missing MD5 file for {pgosm_date}. Cannot validate."
-            logger.error(err)
-            raise FileNotFoundError(err)
+            logger.warning(err)
+            download_needed = True
     else:
-        if pgosm_date != helpers.get_today():
-            err = f"Missing PBF file for {pgosm_date}. Cannot proceed."
-            logger.error(err)
-            raise FileNotFoundError(err)
-
         logger.info("PBF file not found locally. Download required")
         download_needed = True
 
     return download_needed
 
 
-def get_pbf_url(region: str, subregion: str | None) -> str:
-    """Returns the URL to the PBF for the region / subregion.
+def get_pbf_url(region: str, subregion: str | None, pgosm_date: str | None = None) -> str:
+    """Returns the URL to the PBF for the region / subregion."""
+    logger = logging.getLogger("pgosm-flex")
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
 
-    Parameters
-    ----------
-    region : str
-    subregion : str
+    if pgosm_date is None or pgosm_date == today:
+        pgosm_date = "latest"
+    else:
+        try:
+            parsed_date = datetime.strptime(pgosm_date, "%Y-%m-%d")
+            pgosm_date = parsed_date.strftime("%y%m%d")
+        except ValueError:
+            logger.warning(f"PBF date {pgosm_date} not recognized; setting pgosm_date to latest")
+            pgosm_date = "latest"
 
-    Returns
-    -------
-    pbf_url : str
-    """
     base_url = "https://download.geofabrik.de"
 
     if subregion is None:
-        pbf_url = f"{base_url}/{region}-latest.osm.pbf"
+        pbf_url = f"{base_url}/{region}-{pgosm_date}.osm.pbf"
     else:
-        pbf_url = f"{base_url}/{region}/{subregion}-latest.osm.pbf"
+        pbf_url = f"{base_url}/{region}/{subregion}-{pgosm_date}.osm.pbf"
 
     return pbf_url
 
 
-def download_data(region: str, subregion: str | None, pbf_file: str) -> None:
-    """Downloads PBF and MD5 file using wget.
-
-    Parameters
-    ----------
-    region : str
-    subregion : str
-    pbf_file : str
-    """
+def download_data(
+    region: str, subregion: str | None, pbf_file: str, pgosm_date: str | None = None
+) -> None:
+    """Downloads PBF and MD5 file using wget."""
     logger = logging.getLogger("pgosm-flex")
     logger.info(f"Downloading PBF data to {pbf_file}")
-    pbf_url = get_pbf_url(region, subregion)
+    pbf_url = get_pbf_url(region, subregion, pgosm_date)
 
     pbf_folder = os.path.dirname(pbf_file)
     os.makedirs(pbf_folder, exist_ok=True)

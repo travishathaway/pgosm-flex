@@ -22,7 +22,7 @@ from .config import get_config
 LOGGER = logging.getLogger("pgosm-flex")
 
 
-def wait_for_postgres():
+def wait_for_postgres() -> None:
     """Ensures Postgres service is reliably ready for use.
 
     Required b/c Postgres process in Docker gets restarted shortly
@@ -63,25 +63,19 @@ def pg_isready() -> bool:
     """Checks for Postgres to be available.
 
     Uses pg_version_check() for simple approach.
-
-    Returns
-    -------
-    pg_up : bool
     """
     try:
-        result = pg_version_check()
+        pg_version_check()
     except AttributeError:
         err_msg = "Error checking version, likely waiting for Postgres to start."
         err_msg += " Only an error if it does not go away after a few attempts."
         logging.getLogger("pgosm-flex").warning(err_msg)
         return False
 
-    if result is None:
-        return False
     return True
 
 
-def log_pg_details():
+def log_pg_details() -> None:
     """Logs non-sensitive Postgres connection details to LOGGER."""
     config = get_config()
     pg_host = config.database.host
@@ -95,15 +89,11 @@ def log_pg_details():
     LOGGER.info(msg)
 
 
-def prepare_pgosm_db(db_path):
+def prepare_pgosm_db(db_path: str) -> None:
     """Runs through steps to prepare the target database for PgOSM Flex.
 
     Includes additional preparation for using --replication and --updated=append
     modes.
-
-    Parameters
-    ----------
-    db_path : str
     """
     config = get_config()
 
@@ -137,12 +127,8 @@ def prepare_pgosm_db(db_path):
         osm2pgsql_replication_start()
 
 
-def start_import(osm2pgsql_version):
+def start_import(osm2pgsql_version: str) -> int:
     """Creates record in osm.pgosm_flex table.
-
-    Parameters
-    ----------
-    osm2pgsql_version : str
 
     Returns
     -------
@@ -184,13 +170,13 @@ def start_import(osm2pgsql_version):
     return import_id
 
 
-def pg_version_check():
+def pg_version_check() -> int:
     """Checks Postgres machine-readable server_version_num.
 
     Sends to logs and returns value.
 
-    Results
-    --------------------
+    Returns
+    -------
     pg_version : int
     """
     sql_raw = """
@@ -248,13 +234,9 @@ def drop_pgosm_schema() -> None:
                 sys.exit(1)
 
 
-def create_pgosm_db():
+def create_pgosm_db() -> None:
     """
     Creates the pgosm database and prepares with PostGIS and osm schema
-
-    Returns
-    -------
-    status : bool
     """
     config = get_config()
 
@@ -274,7 +256,7 @@ def create_pgosm_db():
         conn.close()
 
 
-def prepare_osm_schema(db_path: str):
+def prepare_osm_schema(db_path: str) -> None:
     """Runs deploy scripts to prepare the PgOSM Flex database.
 
     This function's code could be simplified, but currently I like the verbosity
@@ -284,8 +266,6 @@ def prepare_osm_schema(db_path: str):
     ----------
     db_path : str
         Path to folder with SQL scripts.
-    skip_qgis_style : bool
-    scheme_name : str
     """
     config = get_config()
 
@@ -528,7 +508,7 @@ def pgosm_after_import(
     return True
 
 
-def pgosm_nested_admin_polygons(flex_path: str, schema_name: str):
+def pgosm_nested_admin_polygons(flex_path: str, schema_name: str) -> None:
     """Runs two stored procedures to calculate nested admin polygons via psql.
 
     Parameters
@@ -580,7 +560,7 @@ def pgosm_nested_admin_polygons(flex_path: str, schema_name: str):
         sys.exit(f"{err_msg} - Check the log output for details.")
 
 
-def osm2pgsql_replication_start():
+def osm2pgsql_replication_start() -> None:
     """Runs pre-replication step to clean out FKs that would prevent updates.
 
     This function is necessary for using `--replication (osm2pgsql-replication)
@@ -595,15 +575,11 @@ def osm2pgsql_replication_start():
         cur.execute(sql_raw)
 
 
-def osm2pgsql_replication_finish(skip_nested: bool):
+def osm2pgsql_replication_finish(skip_nested: bool) -> None:
     """Runs post-replication step to refresh materialized views and rebuild
     nested data when appropriate.
 
     Only needed for `--replication`, not used for `--update append` mode.
-
-    Parameters
-    ----------
-    skip_nested : bool
     """
     config = get_config()
 
@@ -629,7 +605,7 @@ def osm2pgsql_replication_finish(skip_nested: bool):
         sys.exit(f"{err_msg} - Check the log output for details.")
 
 
-def run_pg_dump(export_path, skip_qgis_style):
+def run_pg_dump(export_path: str, skip_qgis_style: bool) -> None:
     """Runs pg_dump to save processed data to load into other PostGIS DBs.
 
     Parameters
@@ -665,14 +641,10 @@ def run_pg_dump(export_path, skip_qgis_style):
     fix_pg_dump_create_public(export_path)
 
 
-def fix_pg_dump_create_public(export_path: str):
+def fix_pg_dump_create_public(export_path: str) -> None:
     """Using pg_dump with `--schema=public` results in
     a .sql script containing `CREATE SCHEMA public;`, nearly always breaks
     in target DB.  Replaces with `CREATE SCHEMA IF NOT EXISTS public;`
-
-    Parameters
-    ----------
-    export_path : str
     """
     # Read the file content
     with open(export_path) as f:
@@ -688,16 +660,10 @@ def fix_pg_dump_create_public(export_path: str):
     LOGGER.debug("Completed replacement to not fail when public schema exists")
 
 
-def log_import_message(import_id: int, msg: str, schema_name: str):
+def log_import_message(import_id: int, msg: str, schema_name: str) -> None:
     """Logs msg to database in osm.pgosm_flex for import_uuid.
 
     Overwrites `osm_date` if `pbf_timestamp` is set.
-
-    Parameters
-    ----------
-    import_id : int
-    msg : str
-    schema_name: str
     """
     config = get_config()
 
@@ -716,16 +682,7 @@ UPDATE {schema_name}.pgosm_flex
 
 
 def get_prior_import(schema_name: str) -> dict:
-    """Gets the latest import details from osm.pgosm_flex.
-
-    Parameters
-    ----------
-    schema_name : str
-
-    Returns
-    -------
-    results : dict
-    """
+    """Gets the latest import details from osm.pgosm_flex."""
     config = get_config()
     sql_raw = """
         SELECT id, osm_date, region, layerset, import_status,
