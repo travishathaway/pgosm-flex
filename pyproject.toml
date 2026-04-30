@@ -31,7 +31,7 @@ xfail_strict = true
 
 [tool.pixi.workspace]
 channels = ["file:///Users/travishathaway/opt/conda-local-channel", "conda-forge"]
-platforms = ["osx-arm64"] # ["osx-arm64", "osx-64", "linux-64", "win-64"]
+platforms = ["osx-arm64", "linux-64"]
 
 [tool.pixi.pypi-dependencies]
 pgosm-flex = { path = ".", editable = true }
@@ -52,10 +52,10 @@ pydantic-settings = ">=2.0"
 tomli = ">=2.0.1" #; python_version<'3.11'",
 postgresql = ">=18"
 osmium-tool = "*"
-osm2pgsql = ">=2"
 platformdirs = ">=4.9.2,<5"
-protobuf-c = ">=1.5.2,<2"
-postgis = "3.6.2.*"
+python = ">=3.10"
+postgis = ">=3.6.2,<4"
+protobuf-c = "*" 
 
 [tool.pixi.feature.dev.dependencies]
 coverage = ">=7.13.1"

@@ -299,3 +299,11 @@ database with tables loaded into it. Here are the scenarios I'll focus on:
 - Using the `--replication` twice; once with a dataset that's six days old and once with
   a datatset from today.
 
+### Random notes
+
+Before showing the project to the original maintainer, I'd like to get a working CI test system
+in place with GHA. I think this is going to be a very compelling reason to accept the changes I've
+made. But, before this happens, I need to wait on all the changes necessary to get this running
+correctly in conda-forge.
+
+
