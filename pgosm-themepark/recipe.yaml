@@ -1,0 +1,33 @@
+package:
+  name: pgosm-themepark
+  version: "0.1.0"
+
+source:
+  path: .
+
+build:
+  number: 0
+  script:
+    - mkdir -p $PREFIX/share/pgosm-themepark/themes
+    - mkdir -p $PREFIX/share/pgosm-themepark/config
+    - mkdir -p $PREFIX/etc/conda/env_vars.d
+    - cp -r themes/ $PREFIX/share/pgosm-themepark/themes/
+    - cp -r config/ $PREFIX/share/pgosm-themepark/config/
+    - cat > $PREFIX/etc/conda/env_vars.d/pgosm-themepark.json << EOF
+      {
+        "THEMEPARK_PATH": "$PREFIX/share/pgosm-themepark/themes"
+      }
+      EOF
+
+requirements:
+  run:
+    - osm2pgsql-themepark
+
+tests:
+  - script:
+      - test -f $PREFIX/share/pgosm-themepark/themes/pgosm/init.lua
+      - test -f $PREFIX/share/pgosm-themepark/config/default.lua
+      - test -f $PREFIX/share/pgosm-themepark/config/minimal.lua
+      - test -f $PREFIX/share/pgosm-themepark/config/basic.lua
+      - test -f $PREFIX/share/pgosm-themepark/config/everything.lua
+      - test -f $PREFIX/etc/conda/env_vars.d/pgosm-themepark.json
